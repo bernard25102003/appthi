@@ -16,6 +16,7 @@ import { reviewsRouter } from "./modules/reviews/reviews.routes";
 import { promotionsRouter } from "./modules/promotions/promotions.routes";
 import { uploadRouter } from "./modules/upload/upload.routes";
 import { adminRouter } from "./modules/admin/admin.routes";
+import { statusRouter } from "./modules/status/status.routes";
 
 export function createApp(): Application {
   const app = express();
@@ -44,10 +45,8 @@ export function createApp(): Application {
   app.use(express.urlencoded({ extended: true }));
   app.use(cookieParser());
 
-  // ── Health Check ──────────────────────────────────────────────────────────
-  app.get("/health", (_req, res) => {
-    res.json({ status: "ok", timestamp: new Date().toISOString() });
-  });
+  // ── Status Routes (Health & Database) ──────────────────────────────────
+  app.use(statusRouter);
 
   // ── Routes ────────────────────────────────────────────────────────────────
   app.use("/api/auth", authRouter);
