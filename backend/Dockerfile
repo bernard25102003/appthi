@@ -1,45 +1,22 @@
 # Multi-stage build for optimal image size and performance
 
-# Stage 1: Build Frontend
-FROM node:20-alpine AS frontend-builder
-
-WORKDIR /app/frontend
-
-# Copy frontend package files
-COPY frontend/package*.json ./
-COPY frontend/pnpm-workspace.yaml ./
-
-# Install dependencies (using npm)
-RUN npm install
-
-# Copy frontend source
-COPY frontend/src ./src
-COPY frontend/public ./public 2>/dev/null || true
-COPY frontend/vite.config.ts ./
-COPY frontend/tsconfig.json ./
-COPY frontend/postcss.config.mjs ./
-COPY frontend/index.html ./
-
-# Build frontend
-RUN npm run build
-
-# Stage 2: Build Backend
-FROM node:20-alpine AS backend-builder
+# Stage 1: Dependencies and Build
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
 # Copy only package files first for better layer caching
-COPY backend/package*.json ./
+COPY package*.json ./
 
 # Install all dependencies (including dev)
 RUN npm install
 
 # Copy config files
-COPY backend/tsconfig*.json ./
+COPY tsconfig*.json ./
 
 # Copy source code
-COPY backend/src ./src
-COPY backend/prisma ./prisma
+COPY src ./src
+COPY prisma ./prisma
 
 # Generate Prisma client
 RUN npm run db:generate
@@ -47,7 +24,7 @@ RUN npm run db:generate
 # Build TypeScript
 RUN npm run build
 
-# Stage 3: Runtime - Minimal production image
+# Stage 2: Runtime - Minimal production image
 FROM node:20-alpine
 
 WORKDIR /app
@@ -60,21 +37,18 @@ RUN apk add --no-cache \
     openssl
 
 # Copy package files
-COPY backend/package*.json ./
+COPY package*.json ./
 
 # Install production dependencies only
 RUN npm install --omit=dev && npm cache clean --force
 
-# Copy built backend application from builder stage
-COPY --from=backend-builder /app/dist ./dist
-COPY --from=backend-builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=backend-builder /app/node_modules/@prisma ./node_modules/@prisma
+# Copy built application from builder stage
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
 # Copy Prisma schema for runtime
-COPY backend/prisma ./prisma
-
-# Copy built frontend from frontend-builder stage
-COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+COPY prisma ./prisma
 
 # Expose application port
 EXPOSE 4000
