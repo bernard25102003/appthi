@@ -1,7 +1,7 @@
 # Multi-stage build for optimal image size and performance
 
 # Stage 1: Dependencies and Build
-FROM node:20-slim AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install all dependencies (including dev)
-RUN npm ci
+RUN npm install
 
 # Copy config files
 COPY tsconfig*.json ./
@@ -25,24 +25,22 @@ RUN npm run db:generate
 RUN npm run build
 
 # Stage 2: Runtime - Minimal production image
-FROM node:20-slim
+FROM node:20-alpine
 
 WORKDIR /app
 
 # Install only required system dependencies
 # dumb-init: handle signals properly for Node.js
-# libssl1.1: required by Prisma for database connections
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    dumb-init=1.2.5-2 \
-    libssl1.1 \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+# openssl: required by Prisma for database connections
+RUN apk add --no-cache \
+    dumb-init \
+    openssl
 
 # Copy package files
 COPY package*.json ./
 
-# Install production dependencies only with npm ci
-RUN npm ci --omit=dev && npm cache clean --force
+# Install production dependencies only
+RUN npm install --omit=dev && npm cache clean --force
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
