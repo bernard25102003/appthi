@@ -27,12 +27,19 @@ services:
     # Optimization settings
     buildFilter:
       paths:
-        - "src/**"
-        - "prisma/**"
-        - "package.json"
-        - "package-lock.json"
-        - "tsconfig*.json"
-        - "Dockerfile"
+        - "backend/src/**"
+        - "backend/prisma/**"
+        - "backend/package.json"
+        - "backend/package-lock.json"
+        - "backend/tsconfig*.json"
+        - "backend/Dockerfile"
+        - "frontend/src/**"
+        - "frontend/package.json"
+        - "frontend/package-lock.json"
+        - "frontend/index.html"
+        - "frontend/vite.config.ts"
+        - "frontend/tsconfig.json"
+        - "frontend/postcss.config.mjs"
 
 # IMPORTANT: Add these environment variables in Render Dashboard:
 # Core Configuration:

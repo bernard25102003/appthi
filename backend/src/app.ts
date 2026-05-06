@@ -66,7 +66,9 @@ export function createApp(): Application {
 
   // ── Serve Frontend Static Files ───────────────────────────────────────────
   // In production, serve the built frontend from ../frontend/dist
-  const frontendPath = path.join(__dirname, "../../../frontend/dist");
+  // __dirname is /app/dist when running from dist/index.js
+  // So we need to go up 2 levels: dist -> app -> frontend/dist
+  const frontendPath = path.join(__dirname, "../frontend/dist");
   app.use(express.static(frontendPath));
 
   // ── SPA Fallback (Client-side routing) ────────────────────────────────────
