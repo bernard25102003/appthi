@@ -50,10 +50,6 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 # Copy Prisma schema for runtime
 COPY prisma ./prisma
 
-# Create non-root user for security
-RUN useradd -m -u 1000 node && chown -R node:node /app
-USER node
-
 # Expose application port
 EXPOSE 4000
 
