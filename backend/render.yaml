@@ -1,13 +1,13 @@
 services:
   - type: web
     name: fastfood-backend
-    runtime: node
+    runtime: docker
     region: singapore
     plan: standard
     
-    # Build configuration
-    buildCommand: "npm install && npm run build"
-    startCommand: "npm start"
+    # Docker configuration
+    dockerfilePath: ./Dockerfile
+    dockerCommand: "node dist/index.js"
     
     # Environment variables
     envVars:
@@ -16,30 +16,52 @@ services:
       - key: PORT
         value: 4000
         
-    # Database migration hook
+    # Database migration hook - runs before deploying
     preRelease:
       - type: exec
         command: "npx prisma migrate deploy"
     
-    # Auto-deploy on push
+    # Auto-deploy on push to main/master
     autoDeployOnPush: true
     
-    # Keep instance alive
-    preReleasePruneUndeployedPreviousVersions: false
+    # Optimization settings
+    buildFilter:
+      paths:
+        - "src/**"
+        - "prisma/**"
+        - "package.json"
+        - "package-lock.json"
+        - "tsconfig*.json"
+        - "Dockerfile"
 
-# Recommended environment variables to add in Render Dashboard:
-# DATABASE_URL - Connection pool URL from Supabase/Render PostgreSQL
-# DIRECT_URL - Direct connection URL for migrations
-# CLIENT_URL - Frontend URL for CORS
-# API_URL - Backend URL (for email links)
-# JWT_ACCESS_SECRET - Min 32 chars
-# JWT_REFRESH_SECRET - Min 32 chars
-# IMAGEKIT_PUBLIC_KEY
-# IMAGEKIT_PRIVATE_KEY
-# IMAGEKIT_URL_ENDPOINT
-# BREVO_API_KEY
-# BREVO_SENDER_NAME
-# BREVO_SENDER_EMAIL
-# RATE_LIMIT_WINDOW_MS
-# RATE_LIMIT_MAX
-# AUTH_RATE_LIMIT_MAX
+# IMPORTANT: Add these environment variables in Render Dashboard:
+# Core Configuration:
+# - NODE_ENV: production
+# - PORT: 4000
+#
+# Database:
+# - DATABASE_URL: Connection pool URL from Supabase/Render PostgreSQL
+# - DIRECT_URL: Direct connection URL for migrations (required)
+#
+# Frontend Integration:
+# - CLIENT_URL: Frontend URL for CORS (e.g., https://appthi.vercel.app)
+# - API_URL: Backend URL for email links (e.g., https://appthi.onrender.com)
+#
+# Security:
+# - JWT_ACCESS_SECRET: Minimum 32 random characters
+# - JWT_REFRESH_SECRET: Minimum 32 random characters
+#
+# Image Upload:
+# - IMAGEKIT_PUBLIC_KEY
+# - IMAGEKIT_PRIVATE_KEY
+# - IMAGEKIT_URL_ENDPOINT
+#
+# Email Service (Brevo):
+# - BREVO_API_KEY
+# - BREVO_SENDER_NAME
+# - BREVO_SENDER_EMAIL
+#
+# Rate Limiting (Optional):
+# - RATE_LIMIT_WINDOW_MS: Default 900000 (15 minutes)
+# - RATE_LIMIT_MAX: Default 100
+# - AUTH_RATE_LIMIT_MAX: Default 5

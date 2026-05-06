@@ -1,56 +1,70 @@
-# Multi-stage build for optimal image size
+# Multi-stage build for optimal image size and performance
 
-# Stage 1: Build
+# Stage 1: Dependencies and Build
 FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy only package files first for better layer caching
 COPY package*.json ./
-COPY tsconfig*.json ./
 
-# Install dependencies
-RUN npm install
+# Install all dependencies (including dev)
+RUN npm ci
+
+# Copy config files
+COPY tsconfig*.json ./
 
 # Copy source code
 COPY src ./src
 COPY prisma ./prisma
 
-# Generate Prisma client BEFORE building
+# Generate Prisma client
 RUN npm run db:generate
 
 # Build TypeScript
 RUN npm run build
 
-# Stage 2: Runtime
+# Stage 2: Runtime - Minimal production image
 FROM node:20-slim
 
 WORKDIR /app
 
-# Install dumb-init and OpenSSL for Prisma
-RUN apt-get update -y && apt-get install -y --no-install-recommends dumb-init openssl && rm -rf /var/lib/apt/lists/*
+# Install only required system dependencies
+# dumb-init: handle signals properly for Node.js
+# libssl1.1: required by Prisma for database connections
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    dumb-init=1.2.5-2 \
+    libssl1.1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Copy package files
 COPY package*.json ./
 
-# Install only production dependencies
-RUN npm install --omit=dev
+# Install production dependencies only with npm ci
+RUN npm ci --omit=dev && npm cache clean --force
 
-# Copy built app from builder
+# Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+
+# Copy Prisma schema for runtime
 COPY prisma ./prisma
 
-# Expose port
+# Create non-root user for security
+RUN useradd -m -u 1000 node && chown -R node:node /app
+USER node
+
+# Expose application port
 EXPOSE 4000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:4000/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+# Health check - verify server is responding
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:4000', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})" || exit 1
 
-# Use dumb-init to handle signals properly
+# Use dumb-init to properly handle signals
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start server
-CMD ["npm", "start"]
+# Start the application
+CMD ["node", "dist/index.js"]
