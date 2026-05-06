@@ -1,6 +1,16 @@
-import { PrismaClient, Role, DiscountType } from "@prisma/client";
+import dotenv from "dotenv";
+import {
+  PrismaClient,
+  Role,
+  DiscountType,
+  OrderStatus,
+  PaymentStatus,
+  PaymentMethod,
+} from "@prisma/client";
 import bcrypt from "bcryptjs";
 import slugify from "slugify";
+
+dotenv.config();
 
 const prisma = new PrismaClient();
 
@@ -203,9 +213,181 @@ async function main() {
   });
 
   console.log("✅  Promotions seeded");
+
+  // ── Addresses ─────────────────────────────────────────────────────────────
+  const address1 = await prisma.address.upsert({
+    where: { id: "addr-john-home" },
+    update: {},
+    create: {
+      id: "addr-john-home",
+      userId: user1.id,
+      label: "Nhà",
+      fullName: "John Doe",
+      phone: "0901234567",
+      street: "123 Nguyen Hue Street",
+      ward: "Ben Thanh",
+      district: "District 1",
+      city: "Ho Chi Minh City",
+      isDefault: true,
+    },
+  });
+
+  const address2 = await prisma.address.upsert({
+    where: { id: "addr-john-office" },
+    update: {},
+    create: {
+      id: "addr-john-office",
+      userId: user1.id,
+      label: "Văn phòng",
+      fullName: "John Doe",
+      phone: "0901234567",
+      street: "456 Tran Hung Dao Street",
+      ward: "Pham Ngu Lao",
+      district: "District 1",
+      city: "Ho Chi Minh City",
+      isDefault: false,
+    },
+  });
+
+  console.log("✅  Addresses seeded");
+
+  // ── Reviews ───────────────────────────────────────────────────────────────
+  const reviewData = [
+    {
+      productId: products[0].id, // Classic Burger
+      userId: user1.id,
+      rating: 5,
+      comment: "Rất ngon! Thịt tươi, xốt vừa vặn. Sẽ mua lại.",
+    },
+    {
+      productId: products[1].id, // Cheese Pizza
+      userId: user1.id,
+      rating: 4,
+      comment: "Pizza tươi, mozzarella được đã. Chỉ tiếc mỏng một chút.",
+    },
+    {
+      productId: products[4].id, // Chocolate Cake
+      userId: user1.id,
+      rating: 5,
+      comment: "Bánh tuyệt vời! Kem mịn, vị chocolate đậm đà.",
+    },
+  ];
+
+  await Promise.all(
+    reviewData.map((r) =>
+      prisma.review.upsert({
+        where: {
+          userId_productId: {
+            productId: r.productId,
+            userId: r.userId,
+          },
+        },
+        update: {},
+        create: {
+          productId: r.productId,
+          userId: r.userId,
+          rating: r.rating,
+          comment: r.comment,
+        },
+      })
+    )
+  );
+
+  console.log("✅  Reviews seeded");
+
+  // ── Orders ────────────────────────────────────────────────────────────────
+  const promotion = await prisma.promotion.findFirst({
+    where: { code: "WELCOME20" },
+  });
+
+  const order1 = await prisma.order.create({
+    data: {
+      orderNumber: `ORD-${new Date().toISOString().split("T")[0]}-001`,
+      userId: user1.id,
+      addressId: address1.id,
+      promotionId: promotion?.id,
+      subtotal: 89000,
+      discountAmount: 17800, // 20%
+      shippingFee: 0,
+      total: 71200,
+      status: OrderStatus.COMPLETED,
+      paymentMethod: PaymentMethod.COD,
+      paymentStatus: PaymentStatus.PAID,
+      deliveryName: "John Doe",
+      deliveryPhone: "0901234567",
+      deliveryAddress: "123 Nguyen Hue Street, Ben Thanh, District 1, Ho Chi Minh City",
+      items: {
+        create: [
+          {
+            productId: products[0].id, // Classic Burger
+            productName: "Classic Burger",
+            productImage: products[0].imageUrl,
+            quantity: 1,
+            unitPrice: 89000,
+          },
+        ],
+      },
+    },
+  });
+
+  const order2 = await prisma.order.create({
+    data: {
+      orderNumber: `ORD-${new Date().toISOString().split("T")[0]}-002`,
+      userId: user1.id,
+      addressId: address1.id,
+      subtotal: 278000, // Cheese Pizza + Chocolate Cake + Cola
+      discountAmount: 0,
+      shippingFee: 20000,
+      total: 298000,
+      status: OrderStatus.PENDING,
+      paymentMethod: PaymentMethod.COD,
+      paymentStatus: PaymentStatus.UNPAID,
+      deliveryName: "John Doe",
+      deliveryPhone: "0901234567",
+      deliveryAddress: "123 Nguyen Hue Street, Ben Thanh, District 1, Ho Chi Minh City",
+      items: {
+        create: [
+          {
+            productId: products[1].id, // Cheese Pizza
+            productName: "Cheese Pizza",
+            productImage: products[1].imageUrl,
+            quantity: 1,
+            unitPrice: 129000,
+          },
+          {
+            productId: products[4].id, // Chocolate Cake
+            productName: "Chocolate Cake",
+            productImage: products[4].imageUrl,
+            quantity: 1,
+            unitPrice: 49000,
+          },
+          {
+            productId: products[5].id, // Cola
+            productName: "Cola",
+            productImage: products[5].imageUrl,
+            quantity: 2,
+            unitPrice: 19000,
+          },
+        ],
+      },
+    },
+  });
+
+  console.log(
+    `✅  Orders seeded (${order1.orderNumber}, ${order2.orderNumber})`
+  );
+
   console.log("\n🎉 Seed completed successfully!");
   console.log("   Admin credentials: admin@fastfood.com / Admin@123456");
   console.log("   User credentials:  john@example.com  / User@123456");
+  console.log("\n📋 Sample Data:");
+  console.log(`   - ${categories.length} categories`);
+  console.log(`   - ${products.length} products`);
+  console.log("   - 2 users");
+  console.log("   - 2 addresses");
+  console.log("   - 3 reviews");
+  console.log("   - 2 orders");
+  console.log("   - 2 promotions");
 }
 
 main()
