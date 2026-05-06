@@ -1,60 +1,57 @@
-import type { Request, Response, NextFunction } from "express";
-import * as service from "./users.service";
-import { updateProfileSchema, createAddressSchema, updateAddressSchema } from "./users.schema";
+import { Request, Response } from 'express';
+import { UserRole, UserStatus } from '@prisma/client';
+import { UsersService } from './users.service';
+import { sendSuccess, sendNoContent } from '../../middleware/responseHandler';
 
-export async function getProfile(req: Request, res: Response, next: NextFunction) {
-  try {
-    const user = await service.getProfile(req.user!.sub);
-    res.json({ user });
-  } catch (err) {
-    next(err);
+const usersService = new UsersService();
+
+export class UsersController {
+  // ─── Current user ─────────────────────────────────────────────────────────
+
+  async getProfile(req: Request, res: Response): Promise<void> {
+    const user = await usersService.getProfile(req.user!.id);
+    sendSuccess(res, user, 'Profile retrieved');
   }
-}
 
-export async function updateProfile(req: Request, res: Response, next: NextFunction) {
-  try {
-    const data = updateProfileSchema.parse(req.body);
-    const user = await service.updateProfile(req.user!.sub, data);
-    res.json({ user });
-  } catch (err) {
-    next(err);
+  async updateProfile(req: Request, res: Response): Promise<void> {
+    const user = await usersService.updateProfile(req.user!.id, req.body);
+    sendSuccess(res, user, 'Profile updated');
   }
-}
 
-export async function getAddresses(req: Request, res: Response, next: NextFunction) {
-  try {
-    const addresses = await service.getAddresses(req.user!.sub);
-    res.json({ addresses });
-  } catch (err) {
-    next(err);
+  async changePassword(req: Request, res: Response): Promise<void> {
+    await usersService.changePassword(req.user!.id, req.body);
+    sendSuccess(res, null, 'Password changed successfully');
   }
-}
 
-export async function createAddress(req: Request, res: Response, next: NextFunction) {
-  try {
-    const data = createAddressSchema.parse(req.body);
-    const address = await service.createAddress(req.user!.sub, data);
-    res.status(201).json({ address });
-  } catch (err) {
-    next(err);
+  // ─── Admin ────────────────────────────────────────────────────────────────
+
+  async listUsers(req: Request, res: Response): Promise<void> {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const role = req.query.role as UserRole | undefined;
+    const status = req.query.status as UserStatus | undefined;
+
+    const result = await usersService.listUsers({ page, limit, role, status });
+    sendSuccess(res, result, 'Users retrieved');
   }
-}
 
-export async function updateAddress(req: Request, res: Response, next: NextFunction) {
-  try {
-    const data = updateAddressSchema.parse(req.body);
-    const address = await service.updateAddress(req.params.id, req.user!.sub, data);
-    res.json({ address });
-  } catch (err) {
-    next(err);
+  async getUserById(req: Request, res: Response): Promise<void> {
+    const user = await usersService.getUserById(req.params.userId);
+    sendSuccess(res, user, 'User retrieved');
   }
-}
 
-export async function deleteAddress(req: Request, res: Response, next: NextFunction) {
-  try {
-    await service.deleteAddress(req.params.id, req.user!.sub);
-    res.status(204).send();
-  } catch (err) {
-    next(err);
+  async lockUser(req: Request, res: Response): Promise<void> {
+    const user = await usersService.lockUser(req.user!.id, req.params.userId);
+    sendSuccess(res, user, 'User locked');
+  }
+
+  async unlockUser(req: Request, res: Response): Promise<void> {
+    const user = await usersService.unlockUser(req.params.userId);
+    sendSuccess(res, user, 'User unlocked');
+  }
+
+  async deleteUser(req: Request, res: Response): Promise<void> {
+    await usersService.deleteUser(req.user!.id, req.params.userId);
+    sendNoContent(res);
   }
 }

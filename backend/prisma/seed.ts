@@ -1,398 +1,190 @@
-import dotenv from "dotenv";
-import {
-  PrismaClient,
-  Role,
-  DiscountType,
-  OrderStatus,
-  PaymentStatus,
-  PaymentMethod,
-} from "@prisma/client";
-import bcrypt from "bcryptjs";
-import slugify from "slugify";
-
-dotenv.config();
+import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Seeding database...");
+  console.log('🌱 Starting database seed...');
 
-  // ── Categories ────────────────────────────────────────────────────────────
-  const categoryData = [
-    { name: "Burger", sortOrder: 1 },
-    { name: "Pizza", sortOrder: 2 },
-    { name: "Chicken", sortOrder: 3 },
-    { name: "Salad", sortOrder: 4 },
-    { name: "Dessert", sortOrder: 5 },
-    { name: "Drinks", sortOrder: 6 },
-  ];
-
-  const categories = await Promise.all(
-    categoryData.map((c) =>
-      prisma.category.upsert({
-        where: { slug: slugify(c.name, { lower: true }) },
-        update: {},
-        create: {
-          name: c.name,
-          slug: slugify(c.name, { lower: true }),
-          sortOrder: c.sortOrder,
-          isActive: true,
-        },
-      })
-    )
-  );
-  console.log(`✅  ${categories.length} categories seeded`);
-
-  const catMap = Object.fromEntries(categories.map((c) => [c.name, c.id]));
-
-  // ── Products ──────────────────────────────────────────────────────────────
-  const productData = [
-    {
-      name: "Classic Burger",
-      description: "Juicy beef patty with lettuce, tomato, and special sauce",
-      price: 89000,
-      category: "Burger",
-      imageUrl: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400",
-      rating: 4.5,
-      reviewCount: 128,
-      isFeatured: true,
-    },
-    {
-      name: "Cheese Pizza",
-      description: "Traditional Italian pizza with mozzarella and tomato sauce",
-      price: 129000,
-      category: "Pizza",
-      imageUrl: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=400",
-      rating: 4.8,
-      reviewCount: 256,
-      isFeatured: true,
-    },
-    {
-      name: "Crispy Chicken",
-      description: "Golden fried chicken with herbs and spices",
-      price: 79000,
-      category: "Chicken",
-      imageUrl: "https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=400",
-      rating: 4.6,
-      reviewCount: 189,
-      isFeatured: false,
-    },
-    {
-      name: "Caesar Salad",
-      description: "Fresh romaine lettuce with parmesan and croutons",
-      price: 59000,
-      category: "Salad",
-      imageUrl: "https://images.unsplash.com/photo-1546793665-c74683f339c1?w=400",
-      rating: 4.3,
-      reviewCount: 92,
-      isFeatured: false,
-    },
-    {
-      name: "Chocolate Cake",
-      description: "Rich chocolate layer cake with fudge frosting",
-      price: 49000,
-      category: "Dessert",
-      imageUrl: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400",
-      rating: 4.9,
-      reviewCount: 312,
-      isFeatured: true,
-    },
-    {
-      name: "Cola",
-      description: "Refreshing carbonated soft drink",
-      price: 19000,
-      category: "Drinks",
-      imageUrl: "https://images.unsplash.com/photo-1629203851122-3726ecdf080e?w=400",
-      rating: 4.2,
-      reviewCount: 456,
-      isFeatured: false,
-    },
-    {
-      name: "Double Cheeseburger",
-      description: "Two beef patties with double cheese and bacon",
-      price: 119000,
-      category: "Burger",
-      imageUrl: "https://images.unsplash.com/photo-1553979459-d2229ba7433b?w=400",
-      rating: 4.7,
-      reviewCount: 203,
-      isFeatured: true,
-    },
-    {
-      name: "Pepperoni Pizza",
-      description: "Classic pizza topped with spicy pepperoni slices",
-      price: 149000,
-      category: "Pizza",
-      imageUrl: "https://images.unsplash.com/photo-1628840042765-356cda07504e?w=400",
-      rating: 4.8,
-      reviewCount: 287,
-      isFeatured: false,
-    },
-  ];
-
-  const products = await Promise.all(
-    productData.map((p) => {
-      const slug = slugify(p.name, { lower: true, strict: true });
-      return prisma.product.upsert({
-        where: { slug },
-        update: {},
-        create: {
-          name: p.name,
-          slug,
-          description: p.description,
-          price: p.price,
-          categoryId: catMap[p.category],
-          imageUrl: p.imageUrl,
-          rating: p.rating,
-          reviewCount: p.reviewCount,
-          isFeatured: p.isFeatured,
-          isActive: true,
-        },
-      });
-    })
-  );
-  console.log(`✅  ${products.length} products seeded`);
-
-  // ── Users ─────────────────────────────────────────────────────────────────
-  const adminPasswordHash = await bcrypt.hash("Admin@123456", 10);
-  const userPasswordHash = await bcrypt.hash("User@123456", 10);
-
+  // ─── Admin user ──────────────────────────────────────────────────────────
+  const adminPassword = await bcrypt.hash('Admin@123456', 12);
   const admin = await prisma.user.upsert({
-    where: { email: "admin@fastfood.com" },
+    where: { email: 'admin@ecommerce.com' },
     update: {},
     create: {
-      name: "Admin",
-      email: "admin@fastfood.com",
-      passwordHash: adminPasswordHash,
-      role: Role.ADMIN,
-      isEmailVerified: true,
+      email: 'admin@ecommerce.com',
+      password: adminPassword,
+      name: 'Administrator',
+      phone: '0901234567',
+      role: 'ADMIN',
+      status: 'ACTIVE',
     },
   });
+  console.log(`✅ Admin created: ${admin.email}`);
 
-  const user1 = await prisma.user.upsert({
-    where: { email: "john@example.com" },
+  // ─── Sample user ─────────────────────────────────────────────────────────
+  const userPassword = await bcrypt.hash('User@123456', 12);
+  const user = await prisma.user.upsert({
+    where: { email: 'user@example.com' },
     update: {},
     create: {
-      name: "John Doe",
-      email: "john@example.com",
-      passwordHash: userPasswordHash,
-      phone: "0901234567",
-      role: Role.USER,
-      isEmailVerified: true,
+      email: 'user@example.com',
+      password: userPassword,
+      name: 'Nguyễn Văn A',
+      phone: '0912345678',
+      address: '123 Đường Lê Lợi, Quận 1, TP.HCM',
+      role: 'USER',
+      status: 'ACTIVE',
     },
   });
+  console.log(`✅ Sample user created: ${user.email}`);
 
-  console.log(`✅  Users seeded (admin: ${admin.email}, user: ${user1.email})`);
+  // ─── Categories ───────────────────────────────────────────────────────────
+  const categoriesData = [
+    { name: 'Điện thoại', description: 'Điện thoại thông minh và phụ kiện', icon: '📱' },
+    { name: 'Laptop', description: 'Máy tính xách tay và phụ kiện', icon: '💻' },
+    { name: 'Thời trang', description: 'Quần áo, giày dép và phụ kiện thời trang', icon: '👗' },
+    { name: 'Đồ gia dụng', description: 'Thiết bị và đồ dùng gia đình', icon: '🏠' },
+    { name: 'Sách', description: 'Sách giáo khoa, tiểu thuyết và nhiều hơn nữa', icon: '📚' },
+    { name: 'Thể thao', description: 'Dụng cụ thể thao và tập luyện', icon: '⚽' },
+    { name: 'Mỹ phẩm', description: 'Sản phẩm làm đẹp và chăm sóc da', icon: '💄' },
+    { name: 'Thực phẩm', description: 'Thực phẩm và đồ uống', icon: '🍎' },
+  ];
 
-  // ── Promotions ────────────────────────────────────────────────────────────
-  await prisma.promotion.upsert({
-    where: { code: "WELCOME20" },
-    update: {},
-    create: {
-      code: "WELCOME20",
-      description: "Giảm 20% cho đơn hàng đầu tiên",
-      discountType: DiscountType.PERCENT,
-      discountValue: 20,
-      minOrderValue: 100000,
-      maxDiscount: 50000,
-      usageLimit: 100,
-      isActive: true,
-    },
-  });
+  const categories: Record<string, string> = {};
+  for (const cat of categoriesData) {
+    const created = await prisma.category.upsert({
+      where: { name: cat.name },
+      update: {},
+      create: cat,
+    });
+    categories[cat.name] = created.id;
+    console.log(`✅ Category created: ${cat.name}`);
+  }
 
-  await prisma.promotion.upsert({
-    where: { code: "FREESHIP" },
-    update: {},
-    create: {
-      code: "FREESHIP",
-      description: "Miễn phí giao hàng",
-      discountType: DiscountType.FIXED,
-      discountValue: 20000,
-      minOrderValue: 50000,
-      isActive: true,
-    },
-  });
-
-  console.log("✅  Promotions seeded");
-
-  // ── Addresses ─────────────────────────────────────────────────────────────
-  const address1 = await prisma.address.upsert({
-    where: { id: "addr-john-home" },
-    update: {},
-    create: {
-      id: "addr-john-home",
-      userId: user1.id,
-      label: "Nhà",
-      fullName: "John Doe",
-      phone: "0901234567",
-      street: "123 Nguyen Hue Street",
-      ward: "Ben Thanh",
-      district: "District 1",
-      city: "Ho Chi Minh City",
-      isDefault: true,
-    },
-  });
-
-  const address2 = await prisma.address.upsert({
-    where: { id: "addr-john-office" },
-    update: {},
-    create: {
-      id: "addr-john-office",
-      userId: user1.id,
-      label: "Văn phòng",
-      fullName: "John Doe",
-      phone: "0901234567",
-      street: "456 Tran Hung Dao Street",
-      ward: "Pham Ngu Lao",
-      district: "District 1",
-      city: "Ho Chi Minh City",
-      isDefault: false,
-    },
-  });
-
-  console.log("✅  Addresses seeded");
-
-  // ── Reviews ───────────────────────────────────────────────────────────────
-  const reviewData = [
+  // ─── Products ─────────────────────────────────────────────────────────────
+  const productsData = [
     {
-      productId: products[0].id, // Classic Burger
-      userId: user1.id,
-      rating: 5,
-      comment: "Rất ngon! Thịt tươi, xốt vừa vặn. Sẽ mua lại.",
+      name: 'iPhone 15 Pro Max 256GB',
+      description:
+        'iPhone 15 Pro Max với chip A17 Pro mạnh mẽ, camera 48MP chuyên nghiệp, thiết kế titan cao cấp. Màn hình Super Retina XDR 6.7 inch, Dynamic Island thông minh.',
+      price: 34990000,
+      categoryId: categories['Điện thoại'],
+      soldCount: 150,
+      avgRating: 4.8,
+      reviewCount: 45,
+      images: [
+        'https://ik.imagekit.io/demo/img/image1.jpeg',
+        'https://ik.imagekit.io/demo/img/image2.jpeg',
+      ],
     },
     {
-      productId: products[1].id, // Cheese Pizza
-      userId: user1.id,
-      rating: 4,
-      comment: "Pizza tươi, mozzarella được đã. Chỉ tiếc mỏng một chút.",
+      name: 'Samsung Galaxy S24 Ultra',
+      description:
+        'Samsung Galaxy S24 Ultra với bút S Pen tích hợp, camera 200MP, màn hình Dynamic AMOLED 6.8 inch. Hiệu năng vượt trội với chip Snapdragon 8 Gen 3.',
+      price: 31990000,
+      categoryId: categories['Điện thoại'],
+      soldCount: 120,
+      avgRating: 4.7,
+      reviewCount: 38,
+      images: ['https://ik.imagekit.io/demo/img/image3.jpeg'],
     },
     {
-      productId: products[4].id, // Chocolate Cake
-      userId: user1.id,
-      rating: 5,
-      comment: "Bánh tuyệt vời! Kem mịn, vị chocolate đậm đà.",
+      name: 'MacBook Pro M3 14 inch',
+      description:
+        'MacBook Pro 14 inch với chip Apple M3, màn hình Liquid Retina XDR, thời lượng pin 22 giờ. Hiệu năng vượt trội cho công việc sáng tạo chuyên nghiệp.',
+      price: 52990000,
+      categoryId: categories['Laptop'],
+      soldCount: 80,
+      avgRating: 4.9,
+      reviewCount: 25,
+      images: ['https://ik.imagekit.io/demo/img/image4.jpeg'],
+    },
+    {
+      name: 'Dell XPS 15 OLED',
+      description:
+        'Dell XPS 15 với màn hình OLED 3.5K, Intel Core i9, RAM 32GB, SSD 1TB. Thiết kế mỏng nhẹ premium, hiệu năng mạnh mẽ cho lập trình viên và designer.',
+      price: 45990000,
+      categoryId: categories['Laptop'],
+      soldCount: 60,
+      avgRating: 4.6,
+      reviewCount: 20,
+      images: ['https://ik.imagekit.io/demo/img/image5.jpeg'],
+    },
+    {
+      name: 'Áo Polo Nam Premium',
+      description:
+        'Áo polo nam chất liệu cotton 100% cao cấp, form Regular Fit thoải mái. Thiết kế đơn giản nhưng lịch lãm, phù hợp cho cả đi làm và dạo phố.',
+      price: 299000,
+      categoryId: categories['Thời trang'],
+      soldCount: 500,
+      avgRating: 4.5,
+      reviewCount: 120,
+      images: ['https://ik.imagekit.io/demo/img/image6.jpeg'],
+    },
+    {
+      name: 'Nồi chiên không khí Philips 4.1L',
+      description:
+        'Nồi chiên không khí Philips HD9200 4.1L, công nghệ Rapid Air giúp món ăn giòn đều mà không cần dầu. Dễ vệ sinh, tiết kiệm điện.',
+      price: 1890000,
+      categoryId: categories['Đồ gia dụng'],
+      soldCount: 300,
+      avgRating: 4.7,
+      reviewCount: 89,
+      images: ['https://ik.imagekit.io/demo/img/image7.jpeg'],
+    },
+    {
+      name: 'Đắc Nhân Tâm - Dale Carnegie',
+      description:
+        'Cuốn sách bán chạy nhất mọi thời đại về kỹ năng giao tiếp và ảnh hưởng con người. Được dịch sang hơn 30 ngôn ngữ, giúp hàng triệu người thành công.',
+      price: 89000,
+      categoryId: categories['Sách'],
+      soldCount: 1000,
+      avgRating: 4.9,
+      reviewCount: 250,
+      images: ['https://ik.imagekit.io/demo/img/image8.jpeg'],
+    },
+    {
+      name: 'Bóng đá Adidas Champions League',
+      description:
+        'Bóng đá chính hãng Adidas dùng trong Champions League, chất liệu cao cấp, đường khâu chắc chắn. Size 5 tiêu chuẩn FIFA.',
+      price: 750000,
+      categoryId: categories['Thể thao'],
+      soldCount: 200,
+      avgRating: 4.6,
+      reviewCount: 65,
+      images: ['https://ik.imagekit.io/demo/img/image9.jpeg'],
     },
   ];
 
-  await Promise.all(
-    reviewData.map((r) =>
-      prisma.review.upsert({
-        where: {
-          userId_productId: {
-            productId: r.productId,
-            userId: r.userId,
-          },
+  for (const product of productsData) {
+    const { images, ...productData } = product;
+    const created = await prisma.product.create({
+      data: {
+        ...productData,
+        price: productData.price,
+        images: {
+          create: images.map((url, index) => ({
+            imageUrl: url,
+            displayOrder: index,
+          })),
         },
-        update: {},
-        create: {
-          productId: r.productId,
-          userId: r.userId,
-          rating: r.rating,
-          comment: r.comment,
-        },
-      })
-    )
-  );
-
-  console.log("✅  Reviews seeded");
-
-  // ── Orders ────────────────────────────────────────────────────────────────
-  const promotion = await prisma.promotion.findFirst({
-    where: { code: "WELCOME20" },
-  });
-
-  const order1 = await prisma.order.create({
-    data: {
-      orderNumber: `ORD-${new Date().toISOString().split("T")[0]}-001`,
-      userId: user1.id,
-      addressId: address1.id,
-      promotionId: promotion?.id,
-      subtotal: 89000,
-      discountAmount: 17800, // 20%
-      shippingFee: 0,
-      total: 71200,
-      status: OrderStatus.COMPLETED,
-      paymentMethod: PaymentMethod.COD,
-      paymentStatus: PaymentStatus.PAID,
-      deliveryName: "John Doe",
-      deliveryPhone: "0901234567",
-      deliveryAddress: "123 Nguyen Hue Street, Ben Thanh, District 1, Ho Chi Minh City",
-      items: {
-        create: [
-          {
-            productId: products[0].id, // Classic Burger
-            productName: "Classic Burger",
-            productImage: products[0].imageUrl,
-            quantity: 1,
-            unitPrice: 89000,
-          },
-        ],
       },
-    },
-  });
+    });
+    console.log(`✅ Product created: ${created.name}`);
+  }
 
-  const order2 = await prisma.order.create({
-    data: {
-      orderNumber: `ORD-${new Date().toISOString().split("T")[0]}-002`,
-      userId: user1.id,
-      addressId: address1.id,
-      subtotal: 278000, // Cheese Pizza + Chocolate Cake + Cola
-      discountAmount: 0,
-      shippingFee: 20000,
-      total: 298000,
-      status: OrderStatus.PENDING,
-      paymentMethod: PaymentMethod.COD,
-      paymentStatus: PaymentStatus.UNPAID,
-      deliveryName: "John Doe",
-      deliveryPhone: "0901234567",
-      deliveryAddress: "123 Nguyen Hue Street, Ben Thanh, District 1, Ho Chi Minh City",
-      items: {
-        create: [
-          {
-            productId: products[1].id, // Cheese Pizza
-            productName: "Cheese Pizza",
-            productImage: products[1].imageUrl,
-            quantity: 1,
-            unitPrice: 129000,
-          },
-          {
-            productId: products[4].id, // Chocolate Cake
-            productName: "Chocolate Cake",
-            productImage: products[4].imageUrl,
-            quantity: 1,
-            unitPrice: 49000,
-          },
-          {
-            productId: products[5].id, // Cola
-            productName: "Cola",
-            productImage: products[5].imageUrl,
-            quantity: 2,
-            unitPrice: 19000,
-          },
-        ],
-      },
-    },
-  });
-
-  console.log(
-    `✅  Orders seeded (${order1.orderNumber}, ${order2.orderNumber})`
-  );
-
-  console.log("\n🎉 Seed completed successfully!");
-  console.log("   Admin credentials: admin@fastfood.com / Admin@123456");
-  console.log("   User credentials:  john@example.com  / User@123456");
-  console.log("\n📋 Sample Data:");
-  console.log(`   - ${categories.length} categories`);
-  console.log(`   - ${products.length} products`);
-  console.log("   - 2 users");
-  console.log("   - 2 addresses");
-  console.log("   - 3 reviews");
-  console.log("   - 2 orders");
-  console.log("   - 2 promotions");
+  console.log('\n🎉 Seed completed successfully!');
+  console.log('─'.repeat(50));
+  console.log('📧 Admin: admin@ecommerce.com / Admin@123456');
+  console.log('📧 User:  user@example.com / User@123456');
 }
 
 main()
   .catch((e) => {
-    console.error("❌ Seed failed:", e);
+    console.error('❌ Seed failed:', e);
     process.exit(1);
   })
-  .finally(() => prisma.$disconnect());
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

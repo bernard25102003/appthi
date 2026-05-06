@@ -1,291 +1,187 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// Prisma Schema — FastFood Ordering Platform
-// DB: PostgreSQL (Supabase) | ORM: Prisma
-// ─────────────────────────────────────────────────────────────────────────────
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
-  previewFeatures = ["omitApi"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL") // Supabase yêu cầu directUrl cho migrations
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// USERS & AUTH
-// ═════════════════════════════════════════════════════════════════════════════
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
 
-model User {
-  id              String   @id @default(cuid())
-  name            String
-  email           String   @unique
-  passwordHash    String
-  phone           String?
-  avatarUrl       String?  // ImageKit URL
-  avatarFileId    String?  // ImageKit fileId (để xóa)
-  role            Role     @default(USER)
-  isEmailVerified Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  // Relations
-  addresses          Address[]
-  orders             Order[]
-  reviews            Review[]
-  refreshTokens      RefreshToken[]
-  emailVerifications EmailVerification[]
-  passwordResets     PasswordReset[]
-
-  @@map("users")
-}
-
-enum Role {
+enum UserRole {
   USER
   ADMIN
 }
 
-// Refresh token rotation — mỗi refresh tạo token mới, revoke token cũ
-model RefreshToken {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique // SHA-256 hash của raw token
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@map("refresh_tokens")
-}
-
-model EmailVerification {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique // random 32-byte hex
-  expiresAt DateTime // 24h
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("email_verifications")
-}
-
-model PasswordReset {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique // random 32-byte hex
-  expiresAt DateTime // 1h
-  used      Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("password_resets")
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// ADDRESS BOOK
-// ═════════════════════════════════════════════════════════════════════════════
-
-model Address {
-  id        String  @id @default(cuid())
-  userId    String
-  label     String  // "Nhà", "Văn phòng", "Khác"
-  fullName  String
-  phone     String
-  street    String  // Số nhà, tên đường
-  ward      String? // Phường/Xã
-  district  String  // Quận/Huyện
-  city      String  // Tỉnh/Thành phố
-  isDefault Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orders Order[] // snapshot tham chiếu
-
-  @@index([userId])
-  @@map("addresses")
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// CATALOG
-// ═════════════════════════════════════════════════════════════════════════════
-
-model Category {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  slug      String   @unique
-  imageUrl  String?
-  sortOrder Int      @default(0)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  products Product[]
-
-  @@map("categories")
-}
-
-model Product {
-  id           String   @id @default(cuid())
-  name         String
-  slug         String   @unique
-  description  String?
-  price        Int      // VND, lưu dạng integer (89000, 129000)
-  categoryId   String
-  imageUrl     String?  // ImageKit URL (primary)
-  imageFileId  String?  // ImageKit fileId (để xóa/thay)
-  rating       Decimal  @default(0) @db.Decimal(3, 2)
-  reviewCount  Int      @default(0)
-  stock        Int      @default(999) // -1 = unlimited
-  isFeatured   Boolean  @default(false)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  category   Category    @relation(fields: [categoryId], references: [id])
-  orderItems OrderItem[]
-  reviews    Review[]
-
-  @@index([categoryId])
-  @@index([isFeatured])
-  @@index([isActive])
-  @@map("products")
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// PROMOTIONS / COUPONS
-// ═════════════════════════════════════════════════════════════════════════════
-
-model Promotion {
-  id            String       @id @default(cuid())
-  code          String       @unique @db.VarChar(32)
-  description   String?
-  discountType  DiscountType // PERCENT | FIXED
-  discountValue Int          // Nếu PERCENT: 10 = 10%, FIXED: 20000 = 20.000đ
-  minOrderValue Int          @default(0) // Giá trị đơn tối thiểu để áp dụng
-  maxDiscount   Int?         // Cap tối đa cho PERCENT (VD: tối đa giảm 50.000đ)
-  usageLimit    Int?         // null = không giới hạn lượt dùng
-  usedCount     Int          @default(0)
-  isActive      Boolean      @default(true)
-  expiresAt     DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-
-  orders Order[]
-
-  @@map("promotions")
-}
-
-enum DiscountType {
-  PERCENT
-  FIXED
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// ORDERS
-// ═════════════════════════════════════════════════════════════════════════════
-
-model Order {
-  id          String        @id @default(cuid())
-  orderNumber String        @unique // "ORD-20260506-A1B2C3"
-  userId      String
-  addressId   String?       // nullable nếu user xóa address sau
-  promotionId String?
-
-  // Tài chính
-  subtotal       Int // tổng giá sản phẩm (trước discount & shipping)
-  shippingFee    Int @default(20000)
-  discountAmount Int @default(0)
-  total          Int // subtotal + shippingFee - discountAmount
-
-  // Trạng thái
-  status        OrderStatus   @default(PENDING)
-  paymentMethod PaymentMethod
-  paymentStatus PaymentStatus @default(UNPAID)
-
-  // Snapshot thông tin giao hàng tại thời điểm đặt
-  // (phòng trường hợp user chỉnh sửa address sau)
-  deliveryName    String
-  deliveryPhone   String
-  deliveryAddress String // địa chỉ đầy đủ dạng string
-
-  note      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user      User       @relation(fields: [userId], references: [id])
-  address   Address?   @relation(fields: [addressId], references: [id])
-  promotion Promotion? @relation(fields: [promotionId], references: [id])
-  items     OrderItem[]
-
-  @@index([userId])
-  @@index([status])
-  @@index([createdAt])
-  @@map("orders")
-}
-
-model OrderItem {
-  id           String @id @default(cuid())
-  orderId      String
-  productId    String
-  // Snapshot tên + ảnh sản phẩm tại thời điểm mua
-  productName  String
-  productImage String?
-  quantity     Int
-  unitPrice    Int // giá tại thời điểm mua (snapshot)
-
-  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product Product @relation(fields: [productId], references: [id])
-
-  @@map("order_items")
+enum UserStatus {
+  ACTIVE
+  LOCKED
 }
 
 enum OrderStatus {
-  PENDING    // chờ xác nhận
-  CONFIRMED  // đã xác nhận
-  PREPARING  // đang chuẩn bị
-  DELIVERING // đang giao
-  DELIVERED  // đã giao
-  CANCELLED  // đã hủy
+  PENDING
+  CONFIRMED
+  SHIPPING
+  COMPLETED
+  CANCELLED
 }
 
 enum PaymentMethod {
   COD
-  ONLINE
+  BANK_TRANSFER
 }
 
-enum PaymentStatus {
-  UNPAID
-  PAID
-  REFUNDED
+// ─────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  name      String
+  phone     String?
+  address   String?
+  role      UserRole   @default(USER)
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  orders  Order[]
+  reviews Review[]
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@map("users")
 }
 
-// ═════════════════════════════════════════════════════════════════════════════
-// REVIEWS
-// ═════════════════════════════════════════════════════════════════════════════
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  icon        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-model Review {
-  id        String   @id @default(cuid())
-  userId    String
-  productId String
-  orderId   String?  // chỉ được review khi đã mua (kiểm tra ở service layer)
-  rating    Int      // 1–5
-  comment   String?
+  products Product[]
+
+  @@index([name])
+  @@map("categories")
+}
+
+model Product {
+  id          String  @id @default(cuid())
+  name        String
+  description String  @db.Text
+  price       Decimal @db.Decimal(10, 2)
+  categoryId  String
+
+  soldCount   Int     @default(0)
+  avgRating   Decimal @default(0) @db.Decimal(3, 2)
+  reviewCount Int     @default(0)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user    User    @relation(fields: [userId], references: [id])
-  product Product @relation(fields: [productId], references: [id])
+  category   Category       @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  images     ProductImage[]
+  orderItems OrderItem[]
+  reviews    Review[]
 
-  // Mỗi user chỉ review 1 lần / 1 sản phẩm
-  @@unique([userId, productId])
+  @@index([categoryId])
+  @@index([soldCount(sort: Desc)])
+  @@index([avgRating(sort: Desc)])
+  @@index([name])
+  @@index([categoryId, soldCount(sort: Desc), avgRating(sort: Desc)])
+  @@map("products")
+}
+
+model ProductImage {
+  id           String   @id @default(cuid())
+  productId    String
+  imageUrl     String
+  thumbnailUrl String?
+  fileId       String?  // ImageKit file ID for deletion
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
   @@index([productId])
+  @@map("product_images")
+}
+
+model Order {
+  id               String        @id @default(cuid())
+  userId           String
+  orderNumber      String        @unique
+  status           OrderStatus   @default(PENDING)
+  totalPrice       Decimal       @db.Decimal(10, 2)
+  paymentMethod    PaymentMethod
+  recipientName    String
+  recipientPhone   String
+  recipientAddress String
+  notes            String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  confirmedAt DateTime?
+  shippingAt  DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  user  User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  items OrderItem[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@index([userId, status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  productId    String?
+  productName  String
+  productPrice Decimal @db.Decimal(10, 2)
+  productImage String?
+  quantity     Int
+  subtotal     Decimal @db.Decimal(10, 2)
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String
+  userId    String
+  rating    Int      // 1-5
+  title     String?
+  content   String   @db.Text
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])
+  @@index([productId])
+  @@index([rating])
+  @@index([userId])
   @@map("reviews")
 }

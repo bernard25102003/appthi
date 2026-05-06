@@ -1,41 +1,75 @@
-import type { Request, Response, NextFunction } from "express";
-import * as service from "./orders.service";
-import { createOrderSchema } from "./orders.schema";
+import { Request, Response } from 'express';
+import { OrderStatus } from '@prisma/client';
+import { OrdersService } from './orders.service';
+import { sendSuccess, sendCreated } from '../../middleware/responseHandler';
 
-export async function createOrder(req: Request, res: Response, next: NextFunction) {
-  try {
-    const userId = req.user!.sub;
-    const data = createOrderSchema.parse(req.body);
-    const order = await service.createOrder(userId, data);
-    res.status(201).json({ order });
-  } catch (err) {
-    next(err);
+const ordersService = new OrdersService();
+
+export class OrdersController {
+  // ─── User: create order ────────────────────────────────────────────────────
+
+  async createOrder(req: Request, res: Response): Promise<void> {
+    const order = await ordersService.createOrder(req.user!.id, req.body);
+    sendCreated(res, order, 'Order created successfully');
   }
-}
 
-export async function getUserOrders(req: Request, res: Response, next: NextFunction) {
-  try {
-    const orders = await service.getUserOrders(req.user!.sub);
-    res.json({ orders });
-  } catch (err) {
-    next(err);
+  // ─── User: list my orders ──────────────────────────────────────────────────
+
+  async listMyOrders(req: Request, res: Response): Promise<void> {
+    const { page = 1, limit = 10, status } = req.query as Record<string, string>;
+
+    const result = await ordersService.listMyOrders(req.user!.id, {
+      page: Math.max(1, Number(page)),
+      limit: Math.min(100, Math.max(1, Number(limit))),
+      status: status as OrderStatus | undefined,
+    });
+
+    sendSuccess(res, result, 'Orders retrieved');
   }
-}
 
-export async function getOrderById(req: Request, res: Response, next: NextFunction) {
-  try {
-    const order = await service.getOrderById(req.params.id, req.user!.sub);
-    res.json({ order });
-  } catch (err) {
-    next(err);
+  // ─── User: get my order detail ─────────────────────────────────────────────
+
+  async getMyOrderById(req: Request, res: Response): Promise<void> {
+    const order = await ordersService.getOrderById(req.params.orderId, req.user!.id, false);
+    sendSuccess(res, order, 'Order retrieved');
   }
-}
 
-export async function cancelOrder(req: Request, res: Response, next: NextFunction) {
-  try {
-    const order = await service.cancelOrder(req.params.id, req.user!.sub);
-    res.json({ order });
-  } catch (err) {
-    next(err);
+  // ─── User: cancel order ────────────────────────────────────────────────────
+
+  async cancelMyOrder(req: Request, res: Response): Promise<void> {
+    const order = await ordersService.cancelMyOrder(req.params.orderId, req.user!.id);
+    sendSuccess(res, order, 'Order cancelled');
+  }
+
+  // ─── Admin: list all orders ────────────────────────────────────────────────
+
+  async listAllOrders(req: Request, res: Response): Promise<void> {
+    const { page = 1, limit = 10, status, userId } = req.query as Record<string, string>;
+
+    const result = await ordersService.listAllOrders({
+      page: Math.max(1, Number(page)),
+      limit: Math.min(100, Math.max(1, Number(limit))),
+      status: status as OrderStatus | undefined,
+      userId: userId || undefined,
+    });
+
+    sendSuccess(res, result, 'Orders retrieved');
+  }
+
+  // ─── Admin: get order detail ───────────────────────────────────────────────
+
+  async getOrderById(req: Request, res: Response): Promise<void> {
+    const order = await ordersService.getOrderById(req.params.orderId, req.user!.id, true);
+    sendSuccess(res, order, 'Order retrieved');
+  }
+
+  // ─── Admin: update order status ────────────────────────────────────────────
+
+  async updateOrderStatus(req: Request, res: Response): Promise<void> {
+    const order = await ordersService.updateOrderStatus(
+      req.params.orderId,
+      req.body.status as OrderStatus,
+    );
+    sendSuccess(res, order, 'Order status updated');
   }
 }

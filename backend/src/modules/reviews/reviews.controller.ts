@@ -1,43 +1,66 @@
-import type { Request, Response, NextFunction } from "express";
-import * as service from "./reviews.service";
-import { createReviewSchema, updateReviewSchema } from "./reviews.schema";
+import { Request, Response } from 'express';
+import { ReviewsService } from './reviews.service';
+import { sendSuccess, sendCreated, sendNoContent } from '../../middleware/responseHandler';
+import { safeInt } from '../../utils/helpers';
 
-export async function getProductReviews(req: Request, res: Response, next: NextFunction) {
-  try {
-    const reviews = await service.getProductReviews(req.params.productId);
-    res.json({ reviews });
-  } catch (err) {
-    next(err);
+const reviewsService = new ReviewsService();
+
+export class ReviewsController {
+  async createReview(req: Request, res: Response): Promise<void> {
+    const review = await reviewsService.createReview(req.user!.id, req.body);
+    sendCreated(res, review, 'Review created');
   }
-}
 
-export async function createReview(req: Request, res: Response, next: NextFunction) {
-  try {
-    const userId = req.user!.sub;
-    const { productId } = req.params;
-    const data = createReviewSchema.parse(req.body);
-    const review = await service.createReview(userId, productId, data);
-    res.status(201).json({ review });
-  } catch (err) {
-    next(err);
+  async updateReview(req: Request, res: Response): Promise<void> {
+    const review = await reviewsService.updateReview(
+      req.params.reviewId,
+      req.user!.id,
+      req.body,
+    );
+    sendSuccess(res, review, 'Review updated');
   }
-}
 
-export async function updateReview(req: Request, res: Response, next: NextFunction) {
-  try {
-    const data = updateReviewSchema.parse(req.body);
-    const review = await service.updateReview(req.params.id, req.user!.sub, data);
-    res.json({ review });
-  } catch (err) {
-    next(err);
+  async deleteReview(req: Request, res: Response): Promise<void> {
+    const isAdmin = req.user!.role === 'ADMIN';
+    await reviewsService.deleteReview(req.params.reviewId, req.user!.id, isAdmin);
+    sendNoContent(res);
   }
-}
 
-export async function deleteReview(req: Request, res: Response, next: NextFunction) {
-  try {
-    await service.deleteReview(req.params.id, req.user!.sub);
-    res.status(204).send();
-  } catch (err) {
-    next(err);
+  async listProductReviews(req: Request, res: Response): Promise<void> {
+    const page = safeInt(req.query.page, 1) || 1;
+    const limit = Math.min(safeInt(req.query.limit, 10) || 10, 100);
+    const ratingParam = req.query.rating as string | undefined;
+    const rating = ratingParam ? safeInt(ratingParam) : undefined;
+
+    const result = await reviewsService.listProductReviews(req.params.productId, {
+      page,
+      limit,
+      rating,
+    });
+    sendSuccess(res, result, 'Reviews retrieved');
+  }
+
+  async getReviewById(req: Request, res: Response): Promise<void> {
+    const review = await reviewsService.getReviewById(req.params.reviewId);
+    sendSuccess(res, review, 'Review retrieved');
+  }
+
+  async listMyReviews(req: Request, res: Response): Promise<void> {
+    const page = safeInt(req.query.page, 1) || 1;
+    const limit = Math.min(safeInt(req.query.limit, 10) || 10, 100);
+
+    const result = await reviewsService.listMyReviews(req.user!.id, { page, limit });
+    sendSuccess(res, result, 'My reviews retrieved');
+  }
+
+  async adminListAllReviews(req: Request, res: Response): Promise<void> {
+    const page = safeInt(req.query.page, 1) || 1;
+    const limit = Math.min(safeInt(req.query.limit, 20) || 20, 100);
+    const ratingParam = req.query.rating as string | undefined;
+    const rating = ratingParam ? safeInt(ratingParam) : undefined;
+    const productId = req.query.productId as string | undefined;
+
+    const result = await reviewsService.listAllReviews({ page, limit, rating, productId });
+    sendSuccess(res, result, 'Reviews retrieved');
   }
 }

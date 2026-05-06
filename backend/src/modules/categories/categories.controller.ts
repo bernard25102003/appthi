@@ -1,50 +1,32 @@
-import type { Request, Response, NextFunction } from "express";
-import * as service from "./categories.service";
-import { createCategorySchema, updateCategorySchema } from "./categories.schema";
+import { Request, Response } from 'express';
+import { CategoriesService } from './categories.service';
+import { sendSuccess, sendCreated, sendNoContent } from '../../middleware/responseHandler';
 
-export async function getCategories(_req: Request, res: Response, next: NextFunction) {
-  try {
-    const categories = await service.getCategories();
-    res.json({ categories });
-  } catch (err) {
-    next(err);
+const categoriesService = new CategoriesService();
+
+export class CategoriesController {
+  async listCategories(_req: Request, res: Response): Promise<void> {
+    const categories = await categoriesService.listCategories();
+    sendSuccess(res, categories, 'Categories retrieved');
   }
-}
 
-export async function getCategoryBySlug(req: Request, res: Response, next: NextFunction) {
-  try {
-    const category = await service.getCategoryBySlug(req.params.slug);
-    res.json({ category });
-  } catch (err) {
-    next(err);
+  async getCategoryById(req: Request, res: Response): Promise<void> {
+    const category = await categoriesService.getCategoryById(req.params.categoryId);
+    sendSuccess(res, category, 'Category retrieved');
   }
-}
 
-export async function createCategory(req: Request, res: Response, next: NextFunction) {
-  try {
-    const data = createCategorySchema.parse(req.body);
-    const category = await service.createCategory(data);
-    res.status(201).json({ category });
-  } catch (err) {
-    next(err);
+  async createCategory(req: Request, res: Response): Promise<void> {
+    const category = await categoriesService.createCategory(req.body);
+    sendCreated(res, category, 'Category created');
   }
-}
 
-export async function updateCategory(req: Request, res: Response, next: NextFunction) {
-  try {
-    const data = updateCategorySchema.parse(req.body);
-    const category = await service.updateCategory(req.params.id, data);
-    res.json({ category });
-  } catch (err) {
-    next(err);
+  async updateCategory(req: Request, res: Response): Promise<void> {
+    const category = await categoriesService.updateCategory(req.params.categoryId, req.body);
+    sendSuccess(res, category, 'Category updated');
   }
-}
 
-export async function deleteCategory(req: Request, res: Response, next: NextFunction) {
-  try {
-    await service.deleteCategory(req.params.id);
-    res.status(204).send();
-  } catch (err) {
-    next(err);
+  async deleteCategory(req: Request, res: Response): Promise<void> {
+    await categoriesService.deleteCategory(req.params.categoryId);
+    sendNoContent(res);
   }
 }

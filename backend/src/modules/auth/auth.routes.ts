@@ -1,37 +1,58 @@
-import { Router } from "express";
-import rateLimit from "express-rate-limit";
-import { env } from "../../config/env";
-import { authenticate } from "../../middlewares/auth.middleware";
-import * as controller from "./auth.controller";
+import { Router } from 'express';
+import { AuthController } from './auth.controller';
+import { validate } from '../../middleware/validate';
+import { authenticate } from '../../middleware/auth';
+import { authRateLimiter } from '../../middleware/rateLimiter';
+import { asyncHandler } from '../../utils/asyncHandler';
+import {
+  registerSchema,
+  loginSchema,
+  refreshTokenSchema,
+} from '../../utils/validators';
 
-export const authRouter = Router();
+const router = Router();
+const controller = new AuthController();
 
-const authLimiter = rateLimit({
-  windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: env.AUTH_RATE_LIMIT_MAX,
-  message: { error: "Too many requests, please try again later" },
-});
+/**
+ * POST /api/auth/register
+ * Register a new user account
+ */
+router.post(
+  '/register',
+  authRateLimiter,
+  validate(registerSchema),
+  asyncHandler((req, res) => controller.register(req, res)),
+);
 
-// POST /api/auth/register
-authRouter.post("/register", authLimiter, controller.register);
+/**
+ * POST /api/auth/login
+ * Authenticate and receive JWT tokens
+ */
+router.post(
+  '/login',
+  authRateLimiter,
+  validate(loginSchema),
+  asyncHandler((req, res) => controller.login(req, res)),
+);
 
-// POST /api/auth/login
-authRouter.post("/login", authLimiter, controller.login);
+/**
+ * POST /api/auth/refresh
+ * Exchange a valid refresh token for a new token pair
+ */
+router.post(
+  '/refresh',
+  validate(refreshTokenSchema),
+  asyncHandler((req, res) => controller.refreshToken(req, res)),
+);
 
-// POST /api/auth/logout
-authRouter.post("/logout", controller.logout);
+/**
+ * POST /api/auth/logout
+ * Invalidate session (client must discard tokens)
+ */
+router.post(
+  '/logout',
+  authenticate,
+  asyncHandler((req, res) => controller.logout(req, res)),
+);
 
-// POST /api/auth/refresh — lấy access token mới bằng refresh token cookie
-authRouter.post("/refresh", controller.refresh);
-
-// GET /api/auth/me — lấy thông tin user hiện tại
-authRouter.get("/me", authenticate, controller.getMe);
-
-// POST /api/auth/forgot-password
-authRouter.post("/forgot-password", authLimiter, controller.forgotPassword);
-
-// POST /api/auth/reset-password
-authRouter.post("/reset-password", authLimiter, controller.resetPassword);
-
-// GET /api/auth/verify-email/:token
-authRouter.get("/verify-email/:token", controller.verifyEmail);
+export default router;

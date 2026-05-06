@@ -1,64 +1,85 @@
-import slugify from "slugify";
-import { prisma } from "../../config/prisma";
-import { AppError } from "../../middlewares/error.middleware";
+import prisma from '../../config/prisma';
+import {
+  createNotFoundError,
+  createConflictError,
+  createBusinessError,
+} from '../../types/error';
 
-function makeSlug(name: string): string {
-  return slugify(name, { lower: true, strict: true });
-}
-
-export async function getCategories() {
-  return prisma.category.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: "asc" },
-  });
-}
-
-export async function getCategoryBySlug(slug: string) {
-  const category = await prisma.category.findUnique({ where: { slug } });
-  if (!category) throw new AppError(404, "Category not found");
-  return category;
-}
-
-export async function createCategory(data: {
+export interface CreateCategoryDto {
   name: string;
-  slug?: string;
-  imageUrl?: string;
-  sortOrder?: number;
-  isActive?: boolean;
-}) {
-  const slug = data.slug ?? makeSlug(data.name);
-  return prisma.category.create({
-    data: { ...data, slug },
-  });
+  description?: string;
+  icon?: string;
 }
 
-export async function updateCategory(
-  id: string,
-  data: {
-    name?: string;
-    slug?: string;
-    imageUrl?: string;
-    sortOrder?: number;
-    isActive?: boolean;
+export interface UpdateCategoryDto {
+  name?: string;
+  description?: string;
+  icon?: string;
+}
+
+export class CategoriesService {
+  async createCategory(dto: CreateCategoryDto) {
+    const existing = await prisma.category.findUnique({ where: { name: dto.name } });
+    if (existing) {
+      throw createConflictError('Category name already exists');
+    }
+
+    return prisma.category.create({ data: dto });
   }
-) {
-  const category = await prisma.category.findUnique({ where: { id } });
-  if (!category) throw new AppError(404, "Category not found");
 
-  const slug = data.slug ?? (data.name ? makeSlug(data.name) : undefined);
+  async updateCategory(id: string, dto: UpdateCategoryDto) {
+    const existing = await prisma.category.findUnique({ where: { id } });
+    if (!existing) {
+      throw createNotFoundError('Category');
+    }
 
-  return prisma.category.update({
-    where: { id },
-    data: { ...data, ...(slug ? { slug } : {}) },
-  });
-}
+    if (dto.name && dto.name !== existing.name) {
+      const duplicate = await prisma.category.findUnique({ where: { name: dto.name } });
+      if (duplicate) {
+        throw createConflictError('Category name already exists');
+      }
+    }
 
-export async function deleteCategory(id: string) {
-  const category = await prisma.category.findUnique({ where: { id } });
-  if (!category) throw new AppError(404, "Category not found");
+    return prisma.category.update({ where: { id }, data: dto });
+  }
 
-  const hasProducts = await prisma.product.count({ where: { categoryId: id } });
-  if (hasProducts > 0) throw new AppError(409, "Cannot delete category with products");
+  async deleteCategory(id: string) {
+    const existing = await prisma.category.findUnique({ where: { id } });
+    if (!existing) {
+      throw createNotFoundError('Category');
+    }
 
-  await prisma.category.delete({ where: { id } });
+    const productCount = await prisma.product.count({ where: { categoryId: id } });
+    if (productCount > 0) {
+      throw createBusinessError(
+        `Cannot delete category that contains ${productCount} product(s). Move or delete products first.`,
+      );
+    }
+
+    await prisma.category.delete({ where: { id } });
+  }
+
+  async listCategories() {
+    return prisma.category.findMany({
+      orderBy: { name: 'asc' },
+      include: {
+        _count: { select: { products: true } },
+      },
+    });
+  }
+
+  async getCategoryById(id: string) {
+    const category = await prisma.category.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { products: true } },
+      },
+    });
+
+    if (!category) {
+      throw createNotFoundError('Category');
+    }
+
+    return category;
+  }
 }

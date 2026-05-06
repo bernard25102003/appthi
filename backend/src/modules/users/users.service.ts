@@ -1,123 +1,167 @@
-import { prisma } from "../../config/prisma";
-import { imagekit } from "../../config/imagekit";
-import { AppError } from "../../middlewares/error.middleware";
+import bcrypt from 'bcryptjs';
+import { UserRole, UserStatus } from '@prisma/client';
+import prisma from '../../config/prisma';
+import {
+  createNotFoundError,
+  createUnauthorizedError,
+  createForbiddenError,
+} from '../../types/error';
+import { paginate, getSkip } from '../../utils/helpers';
 
-// ── Profile ───────────────────────────────────────────────────────────────────
-
-export async function getProfile(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      avatarUrl: true,
-      role: true,
-      isEmailVerified: true,
-      createdAt: true,
-    },
-  });
-  if (!user) throw new AppError(404, "User not found");
-  return user;
+export interface UpdateProfileDto {
+  name?: string;
+  phone?: string | null;
+  address?: string | null;
 }
 
-export async function updateProfile(
-  userId: string,
-  data: {
-    name?: string;
-    phone?: string;
-    avatarUrl?: string;
-    avatarFileId?: string;
-  }
-) {
-  const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user) throw new AppError(404, "User not found");
-
-  // If replacing avatar, delete old image from ImageKit
-  if (data.avatarFileId && user.avatarFileId && data.avatarFileId !== user.avatarFileId) {
-    await imagekit.deleteFile(user.avatarFileId).catch((e) => console.error("ImageKit delete failed:", e));
-  }
-
-  return prisma.user.update({
-    where: { id: userId },
-    data,
-    select: { id: true, name: true, email: true, phone: true, avatarUrl: true, role: true, isEmailVerified: true },
-  });
+export interface ChangePasswordDto {
+  currentPassword: string;
+  newPassword: string;
 }
 
-// ── Addresses ─────────────────────────────────────────────────────────────────
-
-export async function getAddresses(userId: string) {
-  return prisma.address.findMany({
-    where: { userId },
-    orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
-  });
+export interface ListUsersQuery {
+  page: number;
+  limit: number;
+  role?: UserRole;
+  status?: UserStatus;
 }
 
-export async function createAddress(
-  userId: string,
-  data: {
-    label: string;
-    fullName: string;
-    phone: string;
-    street: string;
-    ward?: string;
-    district: string;
-    city: string;
-    isDefault?: boolean;
-  }
-) {
-  // If this is the first address or marked as default, unset other defaults
-  if (data.isDefault) {
-    await prisma.address.updateMany({ where: { userId }, data: { isDefault: false } });
-  } else {
-    // If no other address exists, set this as default
-    const count = await prisma.address.count({ where: { userId } });
-    if (count === 0) data = { ...data, isDefault: true };
-  }
+const PROFILE_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  phone: true,
+  address: true,
+  role: true,
+  status: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
 
-  return prisma.address.create({ data: { ...data, userId } });
-}
-
-export async function updateAddress(
-  id: string,
-  userId: string,
-  data: {
-    label?: string;
-    fullName?: string;
-    phone?: string;
-    street?: string;
-    ward?: string;
-    district?: string;
-    city?: string;
-    isDefault?: boolean;
-  }
-) {
-  const address = await prisma.address.findFirst({ where: { id, userId } });
-  if (!address) throw new AppError(404, "Address not found");
-
-  if (data.isDefault) {
-    await prisma.address.updateMany({ where: { userId }, data: { isDefault: false } });
-  }
-
-  return prisma.address.update({ where: { id }, data });
-}
-
-export async function deleteAddress(id: string, userId: string) {
-  const address = await prisma.address.findFirst({ where: { id, userId } });
-  if (!address) throw new AppError(404, "Address not found");
-
-  await prisma.address.delete({ where: { id } });
-
-  // If deleted address was the default, assign default to most recent remaining
-  if (address.isDefault) {
-    const remaining = await prisma.address.findFirst({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
+export class UsersService {
+  async getProfile(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: PROFILE_SELECT,
     });
-    if (remaining) {
-      await prisma.address.update({ where: { id: remaining.id }, data: { isDefault: true } });
+
+    if (!user) {
+      throw createNotFoundError('User');
     }
+
+    return user;
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw createNotFoundError('User');
+    }
+
+    return prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: dto.name,
+        phone: dto.phone,
+        address: dto.address,
+      },
+      select: PROFILE_SELECT,
+    });
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw createNotFoundError('User');
+    }
+
+    const isValid = await bcrypt.compare(dto.currentPassword, user.password);
+    if (!isValid) {
+      throw createUnauthorizedError('Current password is incorrect');
+    }
+
+    const hashed = await bcrypt.hash(dto.newPassword, 12);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashed },
+    });
+  }
+
+  // ─── Admin operations ─────────────────────────────────────────────────────
+
+  async listUsers(query: ListUsersQuery) {
+    const { page, limit, role, status } = query;
+    const where: { role?: UserRole; status?: UserStatus } = {};
+    if (role) where.role = role;
+    if (status) where.status = status;
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        select: PROFILE_SELECT,
+        skip: getSkip(page, limit),
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    return paginate(users, total, page, limit);
+  }
+
+  async getUserById(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: PROFILE_SELECT,
+    });
+
+    if (!user) {
+      throw createNotFoundError('User');
+    }
+
+    return user;
+  }
+
+  async lockUser(adminId: string, targetUserId: string) {
+    if (adminId === targetUserId) {
+      throw createForbiddenError('Cannot lock your own account');
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!user) {
+      throw createNotFoundError('User');
+    }
+
+    return prisma.user.update({
+      where: { id: targetUserId },
+      data: { status: UserStatus.LOCKED },
+      select: PROFILE_SELECT,
+    });
+  }
+
+  async unlockUser(targetUserId: string) {
+    const user = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!user) {
+      throw createNotFoundError('User');
+    }
+
+    return prisma.user.update({
+      where: { id: targetUserId },
+      data: { status: UserStatus.ACTIVE },
+      select: PROFILE_SELECT,
+    });
+  }
+
+  async deleteUser(adminId: string, targetUserId: string) {
+    if (adminId === targetUserId) {
+      throw createForbiddenError('Cannot delete your own account');
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: targetUserId } });
+    if (!user) {
+      throw createNotFoundError('User');
+    }
+
+    await prisma.user.delete({ where: { id: targetUserId } });
   }
 }

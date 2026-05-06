@@ -1,205 +1,124 @@
-import crypto from "crypto";
-import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import { prisma } from "../../config/prisma";
-import { env } from "../../config/env";
-import { mailer, senderInfo } from "../../config/mailer";
-import { AppError } from "../../middlewares/error.middleware";
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { UserRole } from '@prisma/client';
+import prisma from '../../config/prisma';
+import { env } from '../../config/env';
+import {
+  createConflictError,
+  createUnauthorizedError,
+  createForbiddenError,
+} from '../../types/error';
+import { JwtPayload } from '../../types/auth';
 
-// ── Token helpers ─────────────────────────────────────────────────────────────
-
-function hashToken(raw: string): string {
-  return crypto.createHash("sha256").update(raw).digest("hex");
-}
-
-function generateRawToken(): string {
-  return crypto.randomBytes(32).toString("hex");
-}
-
-function createAccessToken(userId: string, role: string): string {
-  return jwt.sign({ sub: userId, role }, env.JWT_ACCESS_SECRET, {
-    expiresIn: env.JWT_ACCESS_EXPIRES_IN as jwt.SignOptions["expiresIn"],
-  });
-}
-
-async function createRefreshToken(userId: string): Promise<string> {
-  const raw = generateRawToken();
-  const hashed = hashToken(raw);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7d
-  await prisma.refreshToken.create({ data: { userId, token: hashed, expiresAt } });
-  return raw;
-}
-
-// ── Auth service functions ────────────────────────────────────────────────────
-
-export async function register(data: {
-  name: string;
+export interface RegisterDto {
   email: string;
   password: string;
+  name: string;
   phone?: string;
-}) {
-  const existing = await prisma.user.findUnique({ where: { email: data.email } });
-  if (existing) throw new AppError(409, "Email already registered");
-
-  const passwordHash = await bcrypt.hash(data.password, 12);
-
-  const user = await prisma.user.create({
-    data: { name: data.name, email: data.email, passwordHash, phone: data.phone },
-    select: { id: true, name: true, email: true, role: true, isEmailVerified: true, createdAt: true, avatarUrl: true },
-  });
-
-  // Email verification token (24h)
-  const verifyToken = generateRawToken();
-  await prisma.emailVerification.create({
-    data: {
-      userId: user.id,
-      token: verifyToken,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-    },
-  });
-
-  const verifyUrl = `${env.API_URL}/api/auth/verify-email/${verifyToken}`;
-  await mailer.sendMail({
-    from: `"${senderInfo.name}" <${senderInfo.email}>`,
-    to: user.email,
-    subject: "Xác nhận địa chỉ email",
-    html: `<p>Xin chào <strong>${user.name}</strong>,</p>
-           <p>Nhấn <a href="${verifyUrl}">đây</a> để xác nhận email của bạn.</p>
-           <p>Link hết hạn sau 24 giờ.</p>`,
-  }).catch((err) => console.error("Email send failed:", err));
-
-  const accessToken = createAccessToken(user.id, user.role);
-  const refreshToken = await createRefreshToken(user.id);
-
-  return { user, accessToken, refreshToken };
+  address?: string;
 }
 
-export async function login(email: string, password: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) throw new AppError(401, "Invalid email or password");
-
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) throw new AppError(401, "Invalid email or password");
-
-  const accessToken = createAccessToken(user.id, user.role);
-  const refreshToken = await createRefreshToken(user.id);
-
-  return {
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      isEmailVerified: user.isEmailVerified,
-      avatarUrl: user.avatarUrl,
-    },
-    accessToken,
-    refreshToken,
-  };
+export interface LoginDto {
+  email: string;
+  password: string;
 }
 
-export async function refresh(rawToken: string) {
-  const hashed = hashToken(rawToken);
-  const stored = await prisma.refreshToken.findUnique({ where: { token: hashed } });
+export interface TokenPair {
+  accessToken: string;
+  refreshToken: string;
+}
 
-  if (!stored || stored.expiresAt < new Date()) {
-    if (stored) await prisma.refreshToken.delete({ where: { id: stored.id } });
-    throw new AppError(401, "Invalid or expired refresh token");
+const USER_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  phone: true,
+  address: true,
+  role: true,
+  status: true,
+  createdAt: true,
+} as const;
+
+export class AuthService {
+  async register(dto: RegisterDto) {
+    const existing = await prisma.user.findUnique({ where: { email: dto.email } });
+    if (existing) {
+      throw createConflictError('Email already registered');
+    }
+
+    const hashedPassword = await bcrypt.hash(dto.password, 12);
+
+    const user = await prisma.user.create({
+      data: {
+        email: dto.email,
+        password: hashedPassword,
+        name: dto.name,
+        phone: dto.phone,
+        address: dto.address,
+      },
+      select: USER_SELECT,
+    });
+
+    const tokens = this.generateTokens(user.id, user.email, user.role);
+    return { user, ...tokens };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: stored.userId },
-    select: { id: true, role: true },
-  });
-  if (!user) throw new AppError(401, "User not found");
+  async login(dto: LoginDto) {
+    const user = await prisma.user.findUnique({ where: { email: dto.email } });
+    if (!user) {
+      // Use same message for both cases to prevent user enumeration
+      throw createUnauthorizedError('Invalid email or password');
+    }
 
-  // Rotation: delete old token, issue new pair
-  await prisma.refreshToken.delete({ where: { id: stored.id } });
+    if (user.status === 'LOCKED') {
+      throw createForbiddenError('Account is locked');
+    }
 
-  const accessToken = createAccessToken(user.id, user.role);
-  const newRefreshToken = await createRefreshToken(user.id);
+    const isValid = await bcrypt.compare(dto.password, user.password);
+    if (!isValid) {
+      throw createUnauthorizedError('Invalid email or password');
+    }
 
-  return { accessToken, newRefreshToken };
-}
-
-export async function logout(rawToken: string) {
-  const hashed = hashToken(rawToken);
-  await prisma.refreshToken.deleteMany({ where: { token: hashed } });
-}
-
-export async function forgotPassword(email: string) {
-  const user = await prisma.user.findUnique({ where: { email } });
-  // Always return success to avoid user enumeration
-  if (!user) return;
-
-  // Invalidate previous reset tokens
-  await prisma.passwordReset.deleteMany({ where: { userId: user.id, used: false } });
-
-  const token = generateRawToken();
-  await prisma.passwordReset.create({
-    data: {
-      userId: user.id,
-      token,
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1h
-    },
-  });
-
-  const resetUrl = `${env.CLIENT_URL}/reset-password?token=${token}`;
-  await mailer.sendMail({
-    from: `"${senderInfo.name}" <${senderInfo.email}>`,
-    to: user.email,
-    subject: "Đặt lại mật khẩu",
-    html: `<p>Xin chào <strong>${user.name}</strong>,</p>
-           <p>Nhấn <a href="${resetUrl}">đây</a> để đặt lại mật khẩu của bạn.</p>
-           <p>Link hết hạn sau 1 giờ.</p>
-           <p>Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>`,
-  }).catch((err) => console.error("Email send failed:", err));
-}
-
-export async function resetPassword(token: string, newPassword: string) {
-  const reset = await prisma.passwordReset.findUnique({ where: { token } });
-
-  if (!reset || reset.used || reset.expiresAt < new Date()) {
-    throw new AppError(400, "Invalid or expired reset token");
+    const tokens = this.generateTokens(user.id, user.email, user.role);
+    const { password: _pw, ...safeUser } = user;
+    return { user: safeUser, ...tokens };
   }
 
-  const passwordHash = await bcrypt.hash(newPassword, 12);
+  async refreshToken(token: string): Promise<TokenPair> {
+    let payload: JwtPayload;
+    try {
+      payload = jwt.verify(token, env.JWT_REFRESH_SECRET) as JwtPayload;
+    } catch {
+      throw createUnauthorizedError('Invalid or expired refresh token');
+    }
 
-  await prisma.$transaction([
-    prisma.user.update({ where: { id: reset.userId }, data: { passwordHash } }),
-    prisma.passwordReset.update({ where: { id: reset.id }, data: { used: true } }),
-    // Invalidate all existing refresh tokens for security
-    prisma.refreshToken.deleteMany({ where: { userId: reset.userId } }),
-  ]);
-}
+    const user = await prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, email: true, role: true, status: true },
+    });
 
-export async function verifyEmail(token: string) {
-  const verification = await prisma.emailVerification.findUnique({ where: { token } });
+    if (!user) {
+      throw createUnauthorizedError('User not found');
+    }
 
-  if (!verification || verification.expiresAt < new Date()) {
-    throw new AppError(400, "Invalid or expired verification token");
+    if (user.status === 'LOCKED') {
+      throw createForbiddenError('Account is locked');
+    }
+
+    return this.generateTokens(user.id, user.email, user.role);
   }
 
-  await prisma.$transaction([
-    prisma.user.update({ where: { id: verification.userId }, data: { isEmailVerified: true } }),
-    prisma.emailVerification.delete({ where: { id: verification.id } }),
-  ]);
-}
+  private generateTokens(userId: string, email: string, role: UserRole): TokenPair {
+    const payload: Omit<JwtPayload, 'iat' | 'exp'> = { sub: userId, email, role };
 
-export async function getMe(userId: string) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      phone: true,
-      avatarUrl: true,
-      role: true,
-      isEmailVerified: true,
-      createdAt: true,
-    },
-  });
-  if (!user) throw new AppError(404, "User not found");
-  return user;
+    const accessToken = jwt.sign(payload, env.JWT_SECRET, {
+      expiresIn: env.JWT_EXPIRE,
+    } as jwt.SignOptions);
+
+    const refreshToken = jwt.sign(payload, env.JWT_REFRESH_SECRET, {
+      expiresIn: env.JWT_REFRESH_EXPIRE,
+    } as jwt.SignOptions);
+
+    return { accessToken, refreshToken };
+  }
 }
