@@ -21,6 +21,10 @@ import { statusRouter } from "./modules/status/status.routes";
 export function createApp(): Application {
   const app = express();
 
+  // ── Trust Proxy ───────────────────────────────────────────────────────────
+  // Required for reverse proxies (Render, Vercel, etc.) to get correct client IP
+  app.set('trust proxy', 1);
+
   // ── Security ──────────────────────────────────────────────────────────────
   app.use(helmet());
   app.use(
