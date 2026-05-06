@@ -16,11 +16,11 @@ RUN npm install
 COPY src ./src
 COPY prisma ./prisma
 
+# Generate Prisma client BEFORE building
+RUN npm run db:generate
+
 # Build TypeScript
 RUN npm run build
-
-# Generate Prisma client
-RUN npm run db:generate
 
 # Stage 2: Runtime
 FROM node:20-alpine
@@ -39,6 +39,7 @@ RUN npm install --omit=dev
 # Copy built app from builder
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY prisma ./prisma
 
 # Expose port
