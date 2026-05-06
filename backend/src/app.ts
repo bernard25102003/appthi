@@ -3,6 +3,7 @@ import helmet from "helmet";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
+import path from "path";
 import { env } from "./config/env";
 import { errorHandler } from "./middlewares/error.middleware";
 
@@ -63,9 +64,20 @@ export function createApp(): Application {
   app.use("/api/upload", uploadRouter);
   app.use("/api/admin", adminRouter);
 
-  // ── 404 ───────────────────────────────────────────────────────────────────
-  app.use((_req, res) => {
-    res.status(404).json({ error: "Route not found" });
+  // ── Serve Frontend Static Files ───────────────────────────────────────────
+  // In production, serve the built frontend from ../frontend/dist
+  const frontendPath = path.join(__dirname, "../../../frontend/dist");
+  app.use(express.static(frontendPath));
+
+  // ── SPA Fallback (Client-side routing) ────────────────────────────────────
+  // For any non-API routes that don't match static files, serve index.html
+  // This enables React Router to handle client-side routing
+  app.get("*", (_req, res) => {
+    res.sendFile(path.join(frontendPath, "index.html"), (err) => {
+      if (err) {
+        res.status(404).json({ error: "Route not found" });
+      }
+    });
   });
 
   // ── Global Error Handler ──────────────────────────────────────────────────

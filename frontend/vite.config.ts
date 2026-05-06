@@ -37,9 +37,9 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'https://appthi.onrender.com',
+        target: process.env.VITE_API_URL || 'http://localhost:4000',
         changeOrigin: true,
-        secure: true,
+        secure: process.env.NODE_ENV === 'production',
       },
     },
   },
