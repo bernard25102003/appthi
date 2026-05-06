@@ -26,8 +26,8 @@ export function Products() {
   // Fetch categories once
   useEffect(() => {
     api
-      .get<ApiCategory[]>(API.CATEGORIES.LIST)
-      .then((res) => setCategories(res ?? []))
+      .get<{ categories: ApiCategory[] }>(API.CATEGORIES.LIST)
+      .then((res) => setCategories(res?.categories ?? []))
       .catch(() => {});
   }, []);
 

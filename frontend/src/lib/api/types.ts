@@ -91,6 +91,10 @@ export interface PaginatedResponse<T> {
   totalPages: number;
 }
 
+export interface CategoriesResponse {
+  categories: ApiCategory[];
+}
+
 export interface AuthResponse {
   user: ApiUser;
   accessToken: string;

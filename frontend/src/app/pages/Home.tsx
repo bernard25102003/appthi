@@ -18,10 +18,10 @@ export function Home() {
           api.get<PaginatedResponse<ApiProduct>>(
             `${API.PRODUCTS.LIST}?featured=true&limit=8`
           ),
-          api.get<ApiCategory[]>(API.CATEGORIES.LIST),
+          api.get<{ categories: ApiCategory[] }>(API.CATEGORIES.LIST),
         ]);
         setFeaturedProducts(productsRes.data ?? []);
-        setCategories(categoriesRes ?? []);
+        setCategories(categoriesRes?.categories ?? []);
       } catch {
         // silently fallback to empty
       } finally {

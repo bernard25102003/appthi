@@ -36,7 +36,10 @@ export function AdminProducts() {
     setIsLoading(true);
     Promise.all([
       fetchProducts(),
-      api.get<ApiCategory[]>(API.CATEGORIES.LIST).then(setCategories).catch(() => {}),
+      api
+        .get<{ categories: ApiCategory[] }>(API.CATEGORIES.LIST)
+        .then((res) => setCategories(res?.categories ?? []))
+        .catch(() => {}),
     ]).finally(() => setIsLoading(false));
   }, []);
 
