@@ -34,7 +34,7 @@ RUN apk add --no-cache dumb-init
 COPY package*.json ./
 
 # Install only production dependencies
-RUN npm install --only=production
+RUN npm install --omit=dev
 
 # Copy built app from builder
 COPY --from=builder /app/dist ./dist
