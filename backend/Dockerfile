@@ -10,7 +10,7 @@ COPY package*.json ./
 COPY tsconfig*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY src ./src
@@ -34,7 +34,7 @@ RUN apk add --no-cache dumb-init
 COPY package*.json ./
 
 # Install only production dependencies
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Copy built app from builder
 COPY --from=builder /app/dist ./dist
