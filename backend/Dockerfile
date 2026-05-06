@@ -1,7 +1,7 @@
 # Multi-stage build for optimal image size
 
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
@@ -23,12 +23,12 @@ RUN npm run db:generate
 RUN npm run build
 
 # Stage 2: Runtime
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
 # Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+RUN apt-get update && apt-get install -y --no-install-recommends dumb-init && rm -rf /var/lib/apt/lists/*
 
 # Copy package files
 COPY package*.json ./
