@@ -1,0 +1,45 @@
+services:
+  - type: web
+    name: fastfood-backend
+    runtime: node
+    region: singapore
+    plan: standard
+    
+    # Build configuration
+    buildCommand: "npm install && npm run build"
+    startCommand: "npm start"
+    
+    # Environment variables
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+        
+    # Database migration hook
+    preRelease:
+      - type: exec
+        command: "npx prisma migrate deploy"
+    
+    # Auto-deploy on push
+    autoDeployOnPush: true
+    
+    # Keep instance alive
+    preReleasePruneUndeployedPreviousVersions: false
+
+# Recommended environment variables to add in Render Dashboard:
+# DATABASE_URL - Connection pool URL from Supabase/Render PostgreSQL
+# DIRECT_URL - Direct connection URL for migrations
+# CLIENT_URL - Frontend URL for CORS
+# API_URL - Backend URL (for email links)
+# JWT_ACCESS_SECRET - Min 32 chars
+# JWT_REFRESH_SECRET - Min 32 chars
+# IMAGEKIT_PUBLIC_KEY
+# IMAGEKIT_PRIVATE_KEY
+# IMAGEKIT_URL_ENDPOINT
+# BREVO_API_KEY
+# BREVO_SENDER_NAME
+# BREVO_SENDER_EMAIL
+# RATE_LIMIT_WINDOW_MS
+# RATE_LIMIT_MAX
+# AUTH_RATE_LIMIT_MAX
