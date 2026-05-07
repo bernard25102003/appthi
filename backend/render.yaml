@@ -32,6 +32,8 @@ services:
         sync: false
       - key: CORS_ORIGIN
         value: https://food.mio.io.vn,https://admin.food.mio.io.vn
+        # If not using custom domain yet, add your Vercel URLs:
+        # value: https://your-user-client.vercel.app,https://your-admin-client.vercel.app
       - key: RATE_LIMIT_MAX
         value: 500
       - key: AUTH_RATE_LIMIT_MAX

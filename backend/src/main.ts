@@ -25,9 +25,20 @@ export const createApp = (): Express => {
   // Trust the first proxy hop so req.ip is the real client IP (needed on Render/Railway)
   app.set('trust proxy', 1);
   app.use(helmet());
+
+  const allowedOrigins = env.CORS_ORIGIN.split(',').map((o) => o.trim());
+
   app.use(
     cors({
-      origin: env.CORS_ORIGIN.split(',').map((o) => o.trim()),
+      origin: (origin, callback) => {
+        // Allow server-to-server requests (no origin header)
+        if (!origin) return callback(null, true);
+        // Exact match against configured origins
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        // Allow any Vercel deployment/preview URL (*.vercel.app)
+        if (origin.endsWith('.vercel.app')) return callback(null, true);
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
