@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router';
+import { useParams, useNavigate, Link, Navigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { ordersApi, type Order, type OrderStatus } from '../services/api';
 
@@ -21,7 +21,7 @@ const statusLabels: Record<OrderStatus, string> = {
 
 export function OrderDetailPage() {
   const { id } = useParams();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [notFound, setNotFound] = useState(false);
@@ -33,10 +33,8 @@ export function OrderDetailPage() {
       .catch(() => setNotFound(true));
   }, [id, isAuthenticated]);
 
-  if (!isAuthenticated) {
-    navigate('/login?redirect=/orders');
-    return null;
-  }
+  if (loading) return null;
+  if (!isAuthenticated) return <Navigate to="/login?redirect=/orders" replace />;
 
   if (notFound) {
     return (

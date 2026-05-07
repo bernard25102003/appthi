@@ -3,6 +3,7 @@ import { authApi, usersApi, setTokens, clearTokens, getAccessToken, type AuthUse
 
 interface AuthContextType {
   user: AuthUser | null;
+  loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (data: { name: string; email: string; password: string; phone?: string; address?: string }) => Promise<void>;
   logout: () => Promise<void>;
@@ -13,6 +14,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
   // Restore session from stored token on mount
   useEffect(() => {
@@ -20,7 +22,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (token) {
       usersApi.getProfile()
         .then(setUser)
-        .catch(() => clearTokens());
+        .catch(() => clearTokens())
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
   }, []);
 
@@ -48,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

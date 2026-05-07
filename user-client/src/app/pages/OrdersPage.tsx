@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, Navigate } from 'react-router';
 import { Package } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ordersApi, type Order, type OrderStatus } from '../services/api';
@@ -21,8 +21,7 @@ const statusLabels: Record<OrderStatus, string> = {
 };
 
 export function OrdersPage() {
-  const { isAuthenticated } = useAuth();
-  const navigate = useNavigate();
+  const { isAuthenticated, loading } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
@@ -32,10 +31,8 @@ export function OrdersPage() {
       .catch(() => {});
   }, [isAuthenticated]);
 
-  if (!isAuthenticated) {
-    navigate('/login?redirect=/orders');
-    return null;
-  }
+  if (loading) return null;
+  if (!isAuthenticated) return <Navigate to="/login?redirect=/orders" replace />;
 
   return (
     <div className="container mx-auto px-4 py-8">

@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, Navigate } from 'react-router';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../contexts/AuthContext';
 import { type PaymentMethod } from '../services/api';
@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 export function CheckoutPage() {
   const { items, totalPrice, createOrder } = useCart();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
@@ -20,15 +20,9 @@ export function CheckoutPage() {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  if (items.length === 0) {
-    navigate('/cart');
-    return null;
-  }
-
-  if (!isAuthenticated) {
-    navigate('/login?redirect=/checkout');
-    return null;
-  }
+  if (authLoading) return null;
+  if (items.length === 0) return <Navigate to="/cart" replace />;
+  if (!isAuthenticated) return <Navigate to="/login?redirect=/checkout" replace />;
 
   const validate = () => {
     const newErrors: Record<string, string> = {};

@@ -30,8 +30,8 @@ export function RegisterPage() {
     }
     if (!formData.password) {
       newErrors.password = 'Vui lòng nhập mật khẩu';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Mật khẩu phải có ít nhất 6 ký tự';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Mật khẩu phải có ít nhất 8 ký tự';
     }
     if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';
@@ -62,7 +62,7 @@ export function RegisterPage() {
       toast.success('Đăng ký thành công!');
       navigate('/');
     } catch (error) {
-      toast.error('Đã có lỗi xảy ra');
+      toast.error((error as Error).message || 'Đã có lỗi xảy ra');
     } finally {
       setLoading(false);
     }

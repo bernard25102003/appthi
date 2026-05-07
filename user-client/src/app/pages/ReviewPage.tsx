@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useParams, useNavigate, Navigate } from 'react-router';
 import { Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { ordersApi, reviewsApi, type Order } from '../services/api';
@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 export function ReviewPage() {
   const { orderId } = useParams();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [reviews, setReviews] = useState<Record<string, { rating: number; content: string }>>({});
@@ -26,10 +26,8 @@ export function ReviewPage() {
       .catch(() => navigate('/orders'));
   }, [orderId, isAuthenticated, navigate]);
 
-  if (!isAuthenticated) {
-    navigate('/login?redirect=/orders');
-    return null;
-  }
+  if (loading) return null;
+  if (!isAuthenticated) return <Navigate to="/login?redirect=/orders" replace />;
 
   if (!order) {
     return (

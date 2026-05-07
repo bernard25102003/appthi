@@ -32,27 +32,7 @@ router.get(
   asyncHandler((req, res) => controller.listMyOrders(req, res)),
 );
 
-/**
- * GET /api/orders/:orderId
- * Get a specific order for the authenticated user
- */
-router.get(
-  '/:orderId',
-  authenticate,
-  asyncHandler((req, res) => controller.getMyOrderById(req, res)),
-);
-
-/**
- * PATCH /api/orders/:orderId/cancel
- * Cancel a PENDING order (user can only cancel their own PENDING orders)
- */
-router.patch(
-  '/:orderId/cancel',
-  authenticate,
-  asyncHandler((req, res) => controller.cancelMyOrder(req, res)),
-);
-
-// ─── Admin routes ─────────────────────────────────────────────────────────────
+// ─── Admin routes (must come before /:orderId to avoid shadowing) ─────────────
 
 /**
  * GET /api/orders/admin/all
@@ -87,6 +67,28 @@ router.patch(
   requireAdmin,
   validate(updateOrderStatusSchema),
   asyncHandler((req, res) => controller.updateOrderStatus(req, res)),
+);
+
+// ─── User parameterised routes ────────────────────────────────────────────────
+
+/**
+ * GET /api/orders/:orderId
+ * Get a specific order for the authenticated user
+ */
+router.get(
+  '/:orderId',
+  authenticate,
+  asyncHandler((req, res) => controller.getMyOrderById(req, res)),
+);
+
+/**
+ * PATCH /api/orders/:orderId/cancel
+ * Cancel a PENDING order (user can only cancel their own PENDING orders)
+ */
+router.patch(
+  '/:orderId/cancel',
+  authenticate,
+  asyncHandler((req, res) => controller.cancelMyOrder(req, res)),
 );
 
 export default router;

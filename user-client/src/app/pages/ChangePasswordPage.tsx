@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, Navigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import { usersApi } from '../services/api';
 import { toast } from 'sonner';
 
 export function ChangePasswordPage() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -15,10 +15,8 @@ export function ChangePasswordPage() {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  if (!isAuthenticated) {
-    navigate('/login');
-    return null;
-  }
+  if (authLoading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -28,8 +26,8 @@ export function ChangePasswordPage() {
     }
     if (!formData.newPassword) {
       newErrors.newPassword = 'Vui lòng nhập mật khẩu mới';
-    } else if (formData.newPassword.length < 6) {
-      newErrors.newPassword = 'Mật khẩu phải có ít nhất 6 ký tự';
+    } else if (formData.newPassword.length < 8) {
+      newErrors.newPassword = 'Mật khẩu phải có ít nhất 8 ký tự';
     }
     if (formData.newPassword !== formData.confirmPassword) {
       newErrors.confirmPassword = 'Mật khẩu xác nhận không khớp';

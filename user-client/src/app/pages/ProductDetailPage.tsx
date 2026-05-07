@@ -20,7 +20,7 @@ export function ProductDetailPage() {
       .then(setProduct)
       .catch(() => setNotFound(true));
     reviewsApi.getByProduct(id, { limit: 20 })
-      .then(res => setReviews(res.items))
+      .then(res => setReviews(res?.items ?? []))
       .catch(() => {});
   }, [id]);
 
