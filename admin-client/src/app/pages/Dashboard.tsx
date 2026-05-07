@@ -1,33 +1,27 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { TrendingUp, ShoppingCart, DollarSign, Package } from 'lucide-react';
-import { orders, products } from '../data/mockData';
+import { useState, useEffect } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { TrendingUp, ShoppingCart, DollarSign, Package, Users } from 'lucide-react';
+import { dashboardApi, type DashboardStats, type Product } from '../services/api';
 
 export function Dashboard() {
-  const totalOrders = orders.length;
-  const totalRevenue = orders.reduce((sum, order) => sum + order.total_price, 0);
-  const totalProducts = products.length;
-  const avgOrderValue = totalRevenue / totalOrders;
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [ordersByStatus, setOrdersByStatus] = useState<{ status: string; count: number }[]>([]);
+  const [topProducts, setTopProducts] = useState<Product[]>([]);
 
-  const ordersByStatus = [
-    { status: 'Chờ xác nhận', count: orders.filter(o => o.status === 'pending').length, color: '#f59e0b' },
-    { status: 'Đã xác nhận', count: orders.filter(o => o.status === 'confirmed').length, color: '#3b82f6' },
-    { status: 'Đang giao', count: orders.filter(o => o.status === 'shipping').length, color: '#8b5cf6' },
-    { status: 'Hoàn thành', count: orders.filter(o => o.status === 'completed').length, color: '#10b981' },
-    { status: 'Đã hủy', count: orders.filter(o => o.status === 'cancelled').length, color: '#ef4444' },
-  ];
-
-  const revenueData = [
-    { date: '01/05', revenue: 850000 },
-    { date: '02/05', revenue: 1200000 },
-    { date: '03/05', revenue: 950000 },
-    { date: '04/05', revenue: 1400000 },
-    { date: '05/05', revenue: 1100000 },
-    { date: '06/05', revenue: totalRevenue },
-  ];
-
-  const topProducts = [...products]
-    .sort((a, b) => b.sold_count - a.sold_count)
-    .slice(0, 5);
+  useEffect(() => {
+    dashboardApi.getStats().then(data => setStats(data || null)).catch(() => setStats(null));
+    dashboardApi.getOrdersByStatus().then((data) => {
+      const statusLabels: Record<string, string> = {
+        PENDING: 'Chờ xác nhận',
+        CONFIRMED: 'Đã xác nhận',
+        SHIPPING: 'Đang giao',
+        COMPLETED: 'Hoàn thành',
+        CANCELLED: 'Đã hủy',
+      };
+      setOrdersByStatus((data || []).map((d: any) => ({ status: statusLabels[d.status] ?? d.status, count: d._count })));
+    }).catch(() => setOrdersByStatus([]));
+    dashboardApi.getTopProducts().then(data => setTopProducts(data || [])).catch(() => setTopProducts([]));
+  }, []);
 
   return (
     <div className="p-6">
@@ -37,25 +31,25 @@ export function Dashboard() {
         <StatCard
           icon={ShoppingCart}
           label="Tổng đơn hàng"
-          value={totalOrders.toString()}
+          value={stats ? stats.totalOrders.toString() : '—'}
           color="bg-blue-500"
         />
         <StatCard
           icon={DollarSign}
           label="Tổng doanh thu"
-          value={`${totalRevenue.toLocaleString('vi-VN')}đ`}
+          value={stats ? `${parseFloat(String(stats.totalRevenue)).toLocaleString('vi-VN')}đ` : '—'}
           color="bg-green-500"
         />
         <StatCard
           icon={Package}
           label="Tổng sản phẩm"
-          value={totalProducts.toString()}
+          value={stats ? stats.totalProducts.toString() : '—'}
           color="bg-purple-500"
         />
         <StatCard
-          icon={TrendingUp}
-          label="Giá trị TB/đơn"
-          value={`${Math.round(avgOrderValue).toLocaleString('vi-VN')}đ`}
+          icon={Users}
+          label="Tổng người dùng"
+          value={stats ? stats.totalUsers.toString() : '—'}
           color="bg-orange-500"
         />
       </div>
@@ -75,15 +69,15 @@ export function Dashboard() {
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Doanh thu 6 ngày gần nhất</h2>
+          <h2 className="text-lg font-semibold text-gray-800 mb-4">Top sản phẩm bán chạy</h2>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={revenueData}>
+            <BarChart data={(topProducts || []).map(p => ({ name: p.name.slice(0, 15) + '...', sold: p.soldCount }))}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
+              <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip formatter={(value: number) => `${value.toLocaleString('vi-VN')}đ`} />
-              <Line type="monotone" dataKey="revenue" stroke="#f97316" strokeWidth={2} />
-            </LineChart>
+              <Tooltip />
+              <Bar dataKey="sold" fill="#8b5cf6" />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
@@ -102,21 +96,29 @@ export function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {topProducts.map((product) => (
+              {(topProducts || []).map((product) => (
                 <tr key={product.id} className="border-b hover:bg-gray-50">
                   <td className="py-3 px-4">
-                    <img src={product.images[0]} alt={product.name} className="w-16 h-16 object-cover rounded" />
+                    {product.images?.[0] ? (
+                      <img
+                        src={product.images?.[0]?.thumbnailUrl ?? product.images?.[0]?.imageUrl}
+                        alt={product.name}
+                        className="w-16 h-16 object-cover rounded"
+                      />
+                    ) : (
+                      <div className="w-16 h-16 bg-gray-200 rounded" />
+                    )}
                   </td>
                   <td className="py-3 px-4 font-medium">{product.name}</td>
-                  <td className="py-3 px-4">{product.sold_count}</td>
+                  <td className="py-3 px-4">{product.soldCount}</td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-1">
                       <span className="text-yellow-500">★</span>
-                      <span>{product.avg_rating}</span>
-                      <span className="text-gray-500 text-sm">({product.review_count})</span>
+                      <span>{parseFloat(product.avgRating).toFixed(1)}</span>
+                      <span className="text-gray-500 text-sm">({product.reviewCount})</span>
                     </div>
                   </td>
-                  <td className="py-3 px-4">{product.price.toLocaleString('vi-VN')}đ</td>
+                  <td className="py-3 px-4">{parseFloat(product.price).toLocaleString('vi-VN')}đ</td>
                 </tr>
               ))}
             </tbody>

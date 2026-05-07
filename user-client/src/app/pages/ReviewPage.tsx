@@ -1,27 +1,42 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { Star } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { mockOrders } from '../mockData';
+import { ordersApi, reviewsApi, type Order } from '../services/api';
 import { toast } from 'sonner';
 
 export function ReviewPage() {
   const { orderId } = useParams();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [reviews, setReviews] = useState<Record<string, { rating: number; comment: string }>>({});
+  const [order, setOrder] = useState<Order | null>(null);
+  const [reviews, setReviews] = useState<Record<string, { rating: number; content: string }>>({});
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!orderId || !isAuthenticated) return;
+    ordersApi.getById(orderId)
+      .then(o => {
+        if (o.status !== 'COMPLETED') {
+          navigate('/orders');
+          return;
+        }
+        setOrder(o);
+      })
+      .catch(() => navigate('/orders'));
+  }, [orderId, isAuthenticated, navigate]);
 
   if (!isAuthenticated) {
     navigate('/login?redirect=/orders');
     return null;
   }
 
-  const order = mockOrders.find(o => o.id === orderId);
-
   if (!order) {
-    navigate('/orders');
-    return null;
+    return (
+      <div className="container mx-auto px-4 py-16 text-center text-muted-foreground">
+        Đang tải...
+      </div>
+    );
   }
 
   const handleRatingChange = (productId: string, rating: number) => {
@@ -31,27 +46,41 @@ export function ReviewPage() {
     }));
   };
 
-  const handleCommentChange = (productId: string, comment: string) => {
+  const handleContentChange = (productId: string, content: string) => {
     setReviews(prev => ({
       ...prev,
-      [productId]: { ...prev[productId], comment },
+      [productId]: { ...prev[productId], content },
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const hasAllRatings = order.items.every(item => reviews[item.product_id]?.rating > 0);
+    const itemsWithProduct = order.items.filter(item => item.productId);
+    const hasAllRatings = itemsWithProduct.every(item => reviews[item.productId!]?.rating > 0);
     if (!hasAllRatings) {
       toast.error('Vui lòng đánh giá tất cả sản phẩm');
       return;
     }
 
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setLoading(false);
-    toast.success('Cảm ơn bạn đã đánh giá!');
-    navigate('/orders');
+    try {
+      await Promise.all(
+        itemsWithProduct.map(item =>
+          reviewsApi.create({
+            productId: item.productId!,
+            rating: reviews[item.productId!]?.rating ?? 5,
+            content: reviews[item.productId!]?.content ?? '',
+          })
+        )
+      );
+      toast.success('Cảm ơn bạn đã đánh giá!');
+      navigate('/orders');
+    } catch (error: any) {
+      toast.error(error?.message ?? 'Đã có lỗi xảy ra');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -61,23 +90,25 @@ export function ReviewPage() {
 
         <div className="bg-card rounded-lg p-6 shadow mb-6">
           <div className="text-sm text-muted-foreground mb-2">Đơn hàng</div>
-          <div className="font-medium">#{order.id}</div>
+          <div className="font-medium">#{order.orderNumber}</div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {order.items.map((item) => {
-            const review = reviews[item.product_id] || { rating: 0, comment: '' };
+          {order.items.filter(item => item.productId).map((item) => {
+            const review = reviews[item.productId!] ?? { rating: 0, content: '' };
 
             return (
-              <div key={item.product_id} className="bg-card rounded-lg p-6 shadow">
+              <div key={item.productId} className="bg-card rounded-lg p-6 shadow">
                 <div className="flex gap-4 mb-4">
                   <div className="w-20 h-20 rounded bg-muted overflow-hidden flex-shrink-0">
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                    {item.productImage && (
+                      <img src={item.productImage} alt={item.productName} className="w-full h-full object-cover" />
+                    )}
                   </div>
                   <div>
-                    <h3 className="text-base mb-1">{item.name}</h3>
+                    <h3 className="text-base mb-1">{item.productName}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {item.price.toLocaleString('vi-VN')}đ
+                      {parseFloat(item.productPrice).toLocaleString('vi-VN')}đ
                     </p>
                   </div>
                 </div>
@@ -89,7 +120,7 @@ export function ReviewPage() {
                       <button
                         key={star}
                         type="button"
-                        onClick={() => handleRatingChange(item.product_id, star)}
+                        onClick={() => handleRatingChange(item.productId!, star)}
                         className="focus:outline-none"
                       >
                         <Star
@@ -107,8 +138,8 @@ export function ReviewPage() {
                 <div>
                   <label className="block mb-2">Nhận xét</label>
                   <textarea
-                    value={review.comment}
-                    onChange={(e) => handleCommentChange(item.product_id, e.target.value)}
+                    value={review.content}
+                    onChange={(e) => handleContentChange(item.productId!, e.target.value)}
                     rows={3}
                     placeholder="Chia sẻ trải nghiệm của bạn..."
                     className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
@@ -139,3 +170,4 @@ export function ReviewPage() {
     </div>
   );
 }
+

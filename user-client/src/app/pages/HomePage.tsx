@@ -1,9 +1,24 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
 import { Star, TrendingUp } from 'lucide-react';
-import { mockCategories, mockProducts } from '../mockData';
+import { categoriesApi, productsApi, type Category, type Product } from '../services/api';
 
 export function HomePage() {
-  const featuredProducts = mockProducts.slice(0, 6);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    categoriesApi.getAll().then(data => setCategories(data || [])).catch(() => {});
+    productsApi
+      .getAll({ sortBy: 'soldCount', sortOrder: 'desc', limit: 6 })
+      .then(res => setFeaturedProducts(res?.items || []))
+      .catch(() => {});
+  }, []);
+
+  const categoryEmoji = (idx: number) => {
+    const emojis = ['🍔', '🍕', '🍗', '🍝', '🥤', '🍰'];
+    return emojis[idx % emojis.length];
+  };
 
   return (
     <div>
@@ -30,14 +45,14 @@ export function HomePage() {
         <div className="container mx-auto px-4">
           <h2 className="text-center mb-12">Danh Mục Sản Phẩm</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {mockCategories.map(category => (
+            {categories.map((category, idx) => (
               <Link
                 key={category.id}
                 to={`/products?category=${category.id}`}
                 className="bg-card p-6 rounded-lg text-center hover:shadow-lg transition-all hover:-translate-y-1"
               >
                 <div className="text-4xl mb-2">
-                  {category.id === '1' ? '🍔' : category.id === '2' ? '🍕' : category.id === '3' ? '🍗' : category.id === '4' ? '🍝' : category.id === '5' ? '🥤' : '🍰'}
+                  {category.icon || categoryEmoji(idx)}
                 </div>
                 <h3 className="text-sm">{category.name}</h3>
               </Link>
@@ -62,7 +77,7 @@ export function HomePage() {
               >
                 <div className="aspect-video overflow-hidden bg-muted">
                   <img
-                    src={product.images[0]}
+                    src={product.images?.[0]?.imageUrl || '/placeholder.jpg'}
                     alt={product.name}
                     className="w-full h-full object-cover hover:scale-110 transition-transform duration-300"
                   />
@@ -72,18 +87,18 @@ export function HomePage() {
                   <div className="flex items-center gap-2 mb-2">
                     <div className="flex items-center gap-1">
                       <Star className="w-4 h-4 fill-secondary text-secondary" />
-                      <span className="text-sm">{product.avg_rating}</span>
+                      <span className="text-sm">{parseFloat(product.avgRating).toFixed(1)}</span>
                     </div>
                     <span className="text-sm text-muted-foreground">
-                      ({product.review_count} đánh giá)
+                      ({product.reviewCount} đánh giá)
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-primary font-bold">
-                      {product.price.toLocaleString('vi-VN')}đ
+                      {parseFloat(product.price).toLocaleString('vi-VN')}đ
                     </span>
                     <span className="text-sm text-muted-foreground">
-                      Đã bán {product.sold_count}
+                      Đã bán {product.soldCount}
                     </span>
                   </div>
                 </div>
@@ -103,3 +118,4 @@ export function HomePage() {
     </div>
   );
 }
+

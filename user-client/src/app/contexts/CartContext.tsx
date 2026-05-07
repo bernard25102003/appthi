@@ -1,15 +1,16 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
-import { CartItem, Order, PaymentMethod } from '../types';
+import { CartItem } from '../types';
+import { ordersApi, type Order, type PaymentMethod } from '../services/api';
 import { toast } from 'sonner';
 
 interface CartContextType {
   items: CartItem[];
   addToCart: (item: Omit<CartItem, 'quantity'>, quantity: number) => void;
-  updateQuantity: (product_id: string, quantity: number) => void;
-  removeFromCart: (product_id: string) => void;
+  updateQuantity: (productId: string, quantity: number) => void;
+  removeFromCart: (productId: string) => void;
   clearCart: () => void;
   totalPrice: number;
-  createOrder: (data: { name: string; phone: string; address: string; payment_method: PaymentMethod }) => Promise<Order>;
+  createOrder: (data: { recipientName: string; recipientPhone: string; recipientAddress: string; paymentMethod: PaymentMethod; notes?: string }) => Promise<Order>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -19,10 +20,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addToCart = (item: Omit<CartItem, 'quantity'>, quantity: number) => {
     setItems(prev => {
-      const existing = prev.find(i => i.product_id === item.product_id);
+      const existing = prev.find(i => i.productId === item.productId);
       if (existing) {
         return prev.map(i =>
-          i.product_id === item.product_id
+          i.productId === item.productId
             ? { ...i, quantity: i.quantity + quantity }
             : i
         );
@@ -32,20 +33,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
     toast.success('Đã thêm vào giỏ hàng');
   };
 
-  const updateQuantity = (product_id: string, quantity: number) => {
+  const updateQuantity = (productId: string, quantity: number) => {
     if (quantity <= 0) {
-      removeFromCart(product_id);
+      removeFromCart(productId);
       return;
     }
     setItems(prev =>
       prev.map(item =>
-        item.product_id === product_id ? { ...item, quantity } : item
+        item.productId === productId ? { ...item, quantity } : item
       )
     );
   };
 
-  const removeFromCart = (product_id: string) => {
-    setItems(prev => prev.filter(item => item.product_id !== product_id));
+  const removeFromCart = (productId: string) => {
+    setItems(prev => prev.filter(item => item.productId !== productId));
     toast.success('Đã xóa khỏi giỏ hàng');
   };
 
@@ -55,22 +56,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const totalPrice = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
-  const createOrder = async (data: { name: string; phone: string; address: string; payment_method: PaymentMethod }): Promise<Order> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const order: Order = {
-      id: 'ORD' + Date.now().toString().slice(-6),
-      user_id: '1',
-      total_price: totalPrice,
-      status: 'pending',
-      payment_method: data.payment_method,
-      name: data.name,
-      phone: data.phone,
-      address: data.address,
-      created_at: new Date().toISOString(),
-      items: items,
-    };
-
+  const createOrder = async (data: {
+    recipientName: string;
+    recipientPhone: string;
+    recipientAddress: string;
+    paymentMethod: PaymentMethod;
+    notes?: string;
+  }): Promise<Order> => {
+    const order = await ordersApi.create({
+      items: items.map(item => ({ productId: item.productId, quantity: item.quantity })),
+      paymentMethod: data.paymentMethod,
+      recipientName: data.recipientName,
+      recipientPhone: data.recipientPhone,
+      recipientAddress: data.recipientAddress,
+      notes: data.notes,
+    });
     clearCart();
     return order;
   };
@@ -89,3 +89,4 @@ export function useCart() {
   }
   return context;
 }
+

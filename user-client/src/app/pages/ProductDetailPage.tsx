@@ -1,7 +1,7 @@
-import { useState } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { Star, Minus, Plus, ShoppingCart } from 'lucide-react';
-import { mockProducts, mockReviews } from '../mockData';
+import { productsApi, reviewsApi, type Product, type Review } from '../services/api';
 import { useCart } from '../contexts/CartContext';
 
 export function ProductDetailPage() {
@@ -10,33 +10,50 @@ export function ProductDetailPage() {
   const { addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [notFound, setNotFound] = useState(false);
 
-  const product = mockProducts.find(p => p.id === id);
+  useEffect(() => {
+    if (!id) return;
+    productsApi.getById(id)
+      .then(setProduct)
+      .catch(() => setNotFound(true));
+    reviewsApi.getByProduct(id, { limit: 20 })
+      .then(res => setReviews(res.items))
+      .catch(() => {});
+  }, [id]);
 
-  if (!product) {
+  if (notFound) {
     return (
       <div className="container mx-auto px-4 py-16 text-center">
-        <div className="text-6xl mb-4">😢</div>
-        <h2 className="mb-4">Không tìm thấy sản phẩm</h2>
+        <div className="text-6xl mb-4">đŸ˜¢</div>
+        <h2 className="mb-4">KhĂ´ng tĂ¬m tháº¥y sáº£n pháº©m</h2>
         <button
           onClick={() => navigate('/products')}
           className="bg-primary text-primary-foreground px-6 py-2 rounded-lg hover:bg-primary/90"
         >
-          Quay lại trang sản phẩm
+          Quay láº¡i trang sáº£n pháº©m
         </button>
       </div>
     );
   }
 
-  const productReviews = mockReviews.filter(r => r.product_id === product.id);
+  if (!product) {
+    return (
+      <div className="container mx-auto px-4 py-16 text-center text-muted-foreground">
+        Äang táº£i...
+      </div>
+    );
+  }
 
   const handleAddToCart = () => {
     addToCart(
       {
-        product_id: product.id,
+        productId: product.id,
         name: product.name,
-        price: product.price,
-        image: product.images[0],
+        price: parseFloat(product.price),
+        image: product.images[0]?.imageUrl ?? '',
       },
       quantity
     );
@@ -49,7 +66,7 @@ export function ProductDetailPage() {
         <div>
           <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-4">
             <img
-              src={product.images[selectedImage]}
+              src={product.images[selectedImage]?.imageUrl}
               alt={product.name}
               className="w-full h-full object-cover"
             />
@@ -64,7 +81,7 @@ export function ProductDetailPage() {
                     selectedImage === idx ? 'border-primary' : 'border-transparent'
                   }`}
                 >
-                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  <img src={img.thumbnailUrl ?? img.imageUrl} alt="" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -80,7 +97,7 @@ export function ProductDetailPage() {
                 <Star
                   key={star}
                   className={`w-5 h-5 ${
-                    star <= product.avg_rating
+                    star <= parseFloat(product.avgRating)
                       ? 'fill-secondary text-secondary'
                       : 'text-gray-300'
                   }`}
@@ -88,22 +105,22 @@ export function ProductDetailPage() {
               ))}
             </div>
             <span className="text-muted-foreground">
-              {product.avg_rating} ({product.review_count} đánh giá)
+              {parseFloat(product.avgRating).toFixed(1)} ({product.reviewCount} Ä‘Ă¡nh giĂ¡)
             </span>
           </div>
           <div className="mb-4">
             <span className="text-3xl text-primary font-bold">
-              {product.price.toLocaleString('vi-VN')}đ
+              {parseFloat(product.price).toLocaleString('vi-VN')}Ä‘
             </span>
           </div>
           <div className="mb-6 text-muted-foreground">
-            Đã bán {product.sold_count} sản phẩm
+            ÄĂ£ bĂ¡n {product.soldCount} sáº£n pháº©m
           </div>
           <p className="mb-6 text-muted-foreground">{product.description}</p>
 
           {/* Quantity Selector */}
           <div className="mb-6">
-            <label className="block mb-2">Số lượng</label>
+            <label className="block mb-2">Sá»‘ lÆ°á»£ng</label>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -131,25 +148,25 @@ export function ProductDetailPage() {
             className="w-full bg-primary text-primary-foreground py-3 rounded-lg hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
           >
             <ShoppingCart className="w-5 h-5" />
-            Thêm vào giỏ hàng
+            ThĂªm vĂ o giá» hĂ ng
           </button>
         </div>
       </div>
 
       {/* Reviews */}
       <div className="border-t border-border pt-8">
-        <h2 className="mb-6">Đánh giá sản phẩm</h2>
-        {productReviews.length === 0 ? (
+        <h2 className="mb-6">ÄĂ¡nh giĂ¡ sáº£n pháº©m</h2>
+        {reviews.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            Chưa có đánh giá nào
+            ChÆ°a cĂ³ Ä‘Ă¡nh giĂ¡ nĂ o
           </div>
         ) : (
           <div className="space-y-4">
-            {productReviews.map((review, idx) => (
-              <div key={idx} className="bg-card p-6 rounded-lg border border-border">
+            {reviews.map((review) => (
+              <div key={review.id} className="bg-card p-6 rounded-lg border border-border">
                 <div className="flex items-start justify-between mb-2">
                   <div>
-                    <div className="font-medium mb-1">{review.user_name}</div>
+                    <div className="font-medium mb-1">{review.user?.name ?? 'KhĂ¡ch hĂ ng'}</div>
                     <div className="flex items-center gap-1 mb-2">
                       {[1, 2, 3, 4, 5].map(star => (
                         <Star
@@ -162,12 +179,16 @@ export function ProductDetailPage() {
                         />
                       ))}
                     </div>
+                    {review.title && <div className="font-medium text-sm mb-1">{review.title}</div>}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {new Date(review.created_at).toLocaleDateString('vi-VN')}
+                    {new Date(review.createdAt).toLocaleDateString('vi-VN')}
                   </div>
                 </div>
-                <p className="text-muted-foreground">{review.comment}</p>
+                <p className="text-muted-foreground">{review.content}</p>
+                {review.verified && (
+                  <span className="text-xs text-green-600 mt-2 inline-block">âœ“ ÄĂ£ mua hĂ ng</span>
+                )}
               </div>
             ))}
           </div>
@@ -176,3 +197,4 @@ export function ProductDetailPage() {
     </div>
   );
 }
+

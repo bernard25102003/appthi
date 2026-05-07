@@ -1,28 +1,36 @@
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Package } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { mockOrders } from '../mockData';
-import { OrderStatus } from '../types';
+import { ordersApi, type Order, type OrderStatus } from '../services/api';
 
 const statusColors: Record<OrderStatus, string> = {
-  pending: 'bg-secondary/20 text-secondary-foreground',
-  confirmed: 'bg-blue-100 text-blue-700',
-  shipping: 'bg-accent/20 text-accent-foreground',
-  completed: 'bg-green-100 text-green-700',
-  cancelled: 'bg-destructive/20 text-destructive',
+  PENDING: 'bg-secondary/20 text-secondary-foreground',
+  CONFIRMED: 'bg-blue-100 text-blue-700',
+  SHIPPING: 'bg-accent/20 text-accent-foreground',
+  COMPLETED: 'bg-green-100 text-green-700',
+  CANCELLED: 'bg-destructive/20 text-destructive',
 };
 
 const statusLabels: Record<OrderStatus, string> = {
-  pending: 'Chờ xác nhận',
-  confirmed: 'Đã xác nhận',
-  shipping: 'Đang giao',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã hủy',
+  PENDING: 'Chờ xác nhận',
+  CONFIRMED: 'Đã xác nhận',
+  SHIPPING: 'Đang giao',
+  COMPLETED: 'Hoàn thành',
+  CANCELLED: 'Đã hủy',
 };
 
 export function OrdersPage() {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    ordersApi.getMyOrders({ limit: 50 })
+      .then(res => setOrders(res.items))
+      .catch(() => {});
+  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     navigate('/login?redirect=/orders');
@@ -33,7 +41,7 @@ export function OrdersPage() {
     <div className="container mx-auto px-4 py-8">
       <h1 className="mb-8">Lịch Sử Đơn Hàng</h1>
 
-      {mockOrders.length === 0 ? (
+      {orders.length === 0 ? (
         <div className="text-center py-16">
           <Package className="w-24 h-24 mx-auto mb-4 text-muted-foreground" />
           <h2 className="mb-4">Chưa có đơn hàng nào</h2>
@@ -46,7 +54,7 @@ export function OrdersPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {mockOrders.map(order => (
+          {orders.map(order => (
             <Link
               key={order.id}
               to={`/orders/${order.id}`}
@@ -54,9 +62,9 @@ export function OrdersPage() {
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h3 className="mb-1">Đơn hàng #{order.id}</h3>
+                  <h3 className="mb-1">Đơn hàng #{order.orderNumber}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {new Date(order.created_at).toLocaleString('vi-VN')}
+                    {new Date(order.createdAt).toLocaleString('vi-VN')}
                   </p>
                 </div>
                 <span className={`px-3 py-1 rounded-full text-sm ${statusColors[order.status]}`}>
@@ -65,15 +73,17 @@ export function OrdersPage() {
               </div>
 
               <div className="space-y-2 mb-4">
-                {order.items.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-3">
+                {order.items.map((item) => (
+                  <div key={item.id} className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded bg-muted overflow-hidden flex-shrink-0">
-                      <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                      {item.productImage && (
+                        <img src={item.productImage} alt={item.productName} className="w-full h-full object-cover" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm line-clamp-1">{item.name}</div>
+                      <div className="text-sm line-clamp-1">{item.productName}</div>
                       <div className="text-sm text-muted-foreground">
-                        {item.quantity} x {item.price.toLocaleString('vi-VN')}đ
+                        {item.quantity} x {parseFloat(item.productPrice).toLocaleString('vi-VN')}đ
                       </div>
                     </div>
                   </div>
@@ -83,7 +93,7 @@ export function OrdersPage() {
               <div className="flex items-center justify-between pt-4 border-t border-border">
                 <span className="text-muted-foreground">Tổng cộng:</span>
                 <span className="font-bold text-primary text-xl">
-                  {order.total_price.toLocaleString('vi-VN')}đ
+                  {parseFloat(order.totalPrice).toLocaleString('vi-VN')}đ
                 </span>
               </div>
             </Link>
@@ -93,3 +103,4 @@ export function OrdersPage() {
     </div>
   );
 }
+

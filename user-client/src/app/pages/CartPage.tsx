@@ -32,7 +32,7 @@ export function CartPage() {
         {/* Cart Items */}
         <div className="lg:col-span-2 space-y-4">
           {items.map(item => (
-            <div key={item.product_id} className="bg-card rounded-lg p-4 shadow flex gap-4">
+            <div key={item.productId} className="bg-card rounded-lg p-4 shadow flex gap-4">
               <div className="w-24 h-24 rounded-lg overflow-hidden bg-muted flex-shrink-0">
                 <img
                   src={item.image}
@@ -47,14 +47,14 @@ export function CartPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <button
-                    onClick={() => updateQuantity(item.product_id, item.quantity - 1)}
+                    onClick={() => updateQuantity(item.productId, item.quantity - 1)}
                     className="w-8 h-8 rounded border border-border hover:bg-muted flex items-center justify-center"
                   >
                     <Minus className="w-4 h-4" />
                   </button>
                   <span className="w-12 text-center">{item.quantity}</span>
                   <button
-                    onClick={() => updateQuantity(item.product_id, item.quantity + 1)}
+                    onClick={() => updateQuantity(item.productId, item.quantity + 1)}
                     className="w-8 h-8 rounded border border-border hover:bg-muted flex items-center justify-center"
                   >
                     <Plus className="w-4 h-4" />
@@ -63,7 +63,7 @@ export function CartPage() {
               </div>
               <div className="flex flex-col items-end justify-between">
                 <button
-                  onClick={() => removeFromCart(item.product_id)}
+                  onClick={() => removeFromCart(item.productId)}
                   className="text-destructive hover:bg-destructive/10 p-2 rounded"
                 >
                   <Trash2 className="w-5 h-5" />

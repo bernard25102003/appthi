@@ -1,37 +1,44 @@
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
-import { mockOrders } from '../mockData';
-import { OrderStatus } from '../types';
+import { ordersApi, type Order, type OrderStatus } from '../services/api';
 
 const statusColors: Record<OrderStatus, string> = {
-  pending: 'bg-secondary/20 text-secondary-foreground',
-  confirmed: 'bg-blue-100 text-blue-700',
-  shipping: 'bg-accent/20 text-accent-foreground',
-  completed: 'bg-green-100 text-green-700',
-  cancelled: 'bg-destructive/20 text-destructive',
+  PENDING: 'bg-secondary/20 text-secondary-foreground',
+  CONFIRMED: 'bg-blue-100 text-blue-700',
+  SHIPPING: 'bg-accent/20 text-accent-foreground',
+  COMPLETED: 'bg-green-100 text-green-700',
+  CANCELLED: 'bg-destructive/20 text-destructive',
 };
 
 const statusLabels: Record<OrderStatus, string> = {
-  pending: 'Chờ xác nhận',
-  confirmed: 'Đã xác nhận',
-  shipping: 'Đang giao',
-  completed: 'Hoàn thành',
-  cancelled: 'Đã hủy',
+  PENDING: 'Chờ xác nhận',
+  CONFIRMED: 'Đã xác nhận',
+  SHIPPING: 'Đang giao',
+  COMPLETED: 'Hoàn thành',
+  CANCELLED: 'Đã hủy',
 };
 
 export function OrderDetailPage() {
   const { id } = useParams();
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const [order, setOrder] = useState<Order | null>(null);
+  const [notFound, setNotFound] = useState(false);
+
+  useEffect(() => {
+    if (!id || !isAuthenticated) return;
+    ordersApi.getById(id)
+      .then(setOrder)
+      .catch(() => setNotFound(true));
+  }, [id, isAuthenticated]);
 
   if (!isAuthenticated) {
     navigate('/login?redirect=/orders');
     return null;
   }
 
-  const order = mockOrders.find(o => o.id === id);
-
-  if (!order) {
+  if (notFound) {
     return (
       <div className="container mx-auto px-4 py-16 text-center">
         <h2 className="mb-4">Không tìm thấy đơn hàng</h2>
@@ -41,6 +48,14 @@ export function OrderDetailPage() {
         >
           Quay lại lịch sử đơn hàng
         </Link>
+      </div>
+    );
+  }
+
+  if (!order) {
+    return (
+      <div className="container mx-auto px-4 py-16 text-center text-muted-foreground">
+        Đang tải...
       </div>
     );
   }
@@ -56,9 +71,9 @@ export function OrderDetailPage() {
       <div className="bg-card rounded-lg p-6 shadow mb-6">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="mb-2">Đơn hàng #{order.id}</h1>
+            <h1 className="mb-2">Đơn hàng #{order.orderNumber}</h1>
             <p className="text-muted-foreground">
-              Ngày đặt: {new Date(order.created_at).toLocaleString('vi-VN')}
+              Ngày đặt: {new Date(order.createdAt).toLocaleString('vi-VN')}
             </p>
           </div>
           <span className={`px-4 py-2 rounded-full ${statusColors[order.status]}`}>
@@ -70,15 +85,16 @@ export function OrderDetailPage() {
           <div>
             <h3 className="mb-3">Thông tin người nhận</h3>
             <div className="space-y-2 text-sm">
-              <p><strong>Họ tên:</strong> {order.name}</p>
-              <p><strong>Số điện thoại:</strong> {order.phone}</p>
-              <p><strong>Địa chỉ:</strong> {order.address}</p>
+              <p><strong>Họ tên:</strong> {order.recipientName}</p>
+              <p><strong>Số điện thoại:</strong> {order.recipientPhone}</p>
+              <p><strong>Địa chỉ:</strong> {order.recipientAddress}</p>
+              {order.notes && <p><strong>Ghi chú:</strong> {order.notes}</p>}
             </div>
           </div>
           <div>
             <h3 className="mb-3">Phương thức thanh toán</h3>
             <div className="text-sm">
-              {order.payment_method === 'COD' ? 'Thanh toán khi nhận hàng' : 'Chuyển khoản ngân hàng'}
+              {order.paymentMethod === 'COD' ? 'Thanh toán khi nhận hàng' : 'Chuyển khoản ngân hàng'}
             </div>
           </div>
         </div>
@@ -86,19 +102,21 @@ export function OrderDetailPage() {
         <div className="mb-6">
           <h3 className="mb-4">Sản phẩm</h3>
           <div className="space-y-3">
-            {order.items.map((item, idx) => (
-              <div key={idx} className="flex gap-4 items-center">
+            {order.items.map((item) => (
+              <div key={item.id} className="flex gap-4 items-center">
                 <div className="w-20 h-20 rounded bg-muted overflow-hidden flex-shrink-0">
-                  <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                  {item.productImage && (
+                    <img src={item.productImage} alt={item.productName} className="w-full h-full object-cover" />
+                  )}
                 </div>
                 <div className="flex-1">
-                  <h4 className="text-sm mb-1">{item.name}</h4>
+                  <h4 className="text-sm mb-1">{item.productName}</h4>
                   <p className="text-sm text-muted-foreground">
-                    {item.quantity} x {item.price.toLocaleString('vi-VN')}đ
+                    {item.quantity} x {parseFloat(item.productPrice).toLocaleString('vi-VN')}đ
                   </p>
                 </div>
                 <div className="font-medium">
-                  {(item.price * item.quantity).toLocaleString('vi-VN')}đ
+                  {parseFloat(item.subtotal).toLocaleString('vi-VN')}đ
                 </div>
               </div>
             ))}
@@ -109,12 +127,12 @@ export function OrderDetailPage() {
           <div className="flex justify-between items-center">
             <span className="font-bold">Tổng cộng</span>
             <span className="font-bold text-primary text-2xl">
-              {order.total_price.toLocaleString('vi-VN')}đ
+              {parseFloat(order.totalPrice).toLocaleString('vi-VN')}đ
             </span>
           </div>
         </div>
 
-        {order.status === 'completed' && (
+        {order.status === 'COMPLETED' && (
           <div className="mt-6">
             <Link
               to={`/orders/${order.id}/review`}
@@ -128,3 +146,4 @@ export function OrderDetailPage() {
     </div>
   );
 }
+

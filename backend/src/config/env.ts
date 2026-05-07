@@ -19,8 +19,8 @@ const envSchema = z.object({
   IMAGEKIT_URL_ENDPOINT: z.string().optional(),
 
   RATE_LIMIT_WINDOW_MS: z.coerce.number().default(900000),
-  RATE_LIMIT_MAX: z.coerce.number().default(100),
-  AUTH_RATE_LIMIT_MAX: z.coerce.number().default(10),
+  RATE_LIMIT_MAX: z.coerce.number().default(500),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().default(20),
 
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   LOG_FILE: z.string().default('logs/app.log'),

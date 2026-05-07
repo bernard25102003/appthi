@@ -1,45 +1,50 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
-import { User } from '../types';
-import { mockUser } from '../mockData';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authApi, usersApi, setTokens, clearTokens, getAccessToken, type AuthUser } from '../services/api';
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (data: { name: string; email: string; password: string; phone: string; address: string }) => Promise<void>;
-  logout: () => void;
+  register: (data: { name: string; email: string; password: string; phone?: string; address?: string }) => Promise<void>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
+
+  // Restore session from stored token on mount
+  useEffect(() => {
+    const token = getAccessToken();
+    if (token) {
+      usersApi.getProfile()
+        .then(setUser)
+        .catch(() => clearTokens());
+    }
+  }, []);
 
   const login = async (email: string, password: string) => {
-    // Mock login
-    await new Promise(resolve => setTimeout(resolve, 500));
-    if (email && password) {
-      setUser(mockUser);
+    const { user: authUser, accessToken, refreshToken } = await authApi.login(email, password);
+    setTokens(accessToken, refreshToken);
+    setUser(authUser);
+  };
+
+  const register = async (data: { name: string; email: string; password: string; phone?: string; address?: string }) => {
+    const { user: authUser, accessToken, refreshToken } = await authApi.register(data);
+    setTokens(accessToken, refreshToken);
+    setUser(authUser);
+  };
+
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch {
+      // ignore errors on logout
+    } finally {
+      clearTokens();
+      setUser(null);
     }
-  };
-
-  const register = async (data: { name: string; email: string; password: string; phone: string; address: string }) => {
-    // Mock register
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const newUser: User = {
-      id: Date.now().toString(),
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      address: data.address,
-      role: 'user',
-      status: 'active',
-    };
-    setUser(newUser);
-  };
-
-  const logout = () => {
-    setUser(null);
   };
 
   return (
@@ -56,3 +61,4 @@ export function useAuth() {
   }
   return context;
 }
+

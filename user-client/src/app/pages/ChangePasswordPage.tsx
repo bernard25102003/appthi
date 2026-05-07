@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
+import { usersApi } from '../services/api';
 import { toast } from 'sonner';
 
 export function ChangePasswordPage() {
@@ -46,10 +47,18 @@ export function ChangePasswordPage() {
     }
 
     setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setLoading(false);
-    toast.success('Đổi mật khẩu thành công!');
-    navigate('/');
+    try {
+      await usersApi.changePassword({
+        currentPassword: formData.currentPassword,
+        newPassword: formData.newPassword,
+      });
+      toast.success('Đổi mật khẩu thành công!');
+      navigate('/');
+    } catch (error: any) {
+      toast.error(error?.message ?? 'Đổi mật khẩu thất bại');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
