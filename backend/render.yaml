@@ -28,7 +28,13 @@ services:
         sync: false
       - key: IMAGEKIT_URL_ENDPOINT
         sync: false
+      - key: DIRECT_URL
+        sync: false
       - key: CORS_ORIGIN
-        value: https://food.mio.io.vn,https://admin.food.mio.io.vn,http://localhost:5173,http://localhost:5174
+        value: https://food.mio.io.vn,https://admin.food.mio.io.vn
+      - key: RATE_LIMIT_MAX
+        value: 500
+      - key: AUTH_RATE_LIMIT_MAX
+        value: 20
       - key: LOG_LEVEL
         value: info

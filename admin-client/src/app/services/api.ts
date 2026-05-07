@@ -328,10 +328,11 @@ export interface DashboardStats {
 }
 
 export const dashboardApi = {
-  getStats: async (): Promise<DashboardStats> => {
+  // Combines stats + topProducts in one Promise.all (3 requests instead of 4)
+  getStats: async (): Promise<DashboardStats & { topProducts: Product[] }> => {
     const [ordersRes, productsRes, usersRes] = await Promise.all([
       ordersApi.getAll({ limit: 1 }),
-      productsApi.getAll({ limit: 1 }),
+      productsApi.getAll({ sortBy: 'soldCount', sortOrder: 'desc', limit: 5 }),
       usersApi.getAll({ limit: 1 }),
     ]);
     return {
@@ -339,6 +340,7 @@ export const dashboardApi = {
       totalProducts: productsRes.pagination.total,
       totalRevenue: 0, // backend has no revenue endpoint
       totalUsers: usersRes.pagination.total,
+      topProducts: productsRes.items,
     };
   },
 

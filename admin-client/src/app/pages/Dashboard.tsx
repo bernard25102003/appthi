@@ -9,7 +9,12 @@ export function Dashboard() {
   const [topProducts, setTopProducts] = useState<Product[]>([]);
 
   useEffect(() => {
-    dashboardApi.getStats().then(data => setStats(data || null)).catch(() => setStats(null));
+    dashboardApi.getStats().then(data => {
+      if (data) {
+        setStats(data);
+        setTopProducts(data.topProducts || []);
+      }
+    }).catch(() => setStats(null));
     dashboardApi.getOrdersByStatus().then((data) => {
       const statusLabels: Record<string, string> = {
         PENDING: 'Chờ xác nhận',
@@ -20,7 +25,6 @@ export function Dashboard() {
       };
       setOrdersByStatus((data || []).map((d: any) => ({ status: statusLabels[d.status] ?? d.status, count: d._count })));
     }).catch(() => setOrdersByStatus([]));
-    dashboardApi.getTopProducts().then(data => setTopProducts(data || [])).catch(() => setTopProducts([]));
   }, []);
 
   return (

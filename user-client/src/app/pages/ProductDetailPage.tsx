@@ -53,7 +53,7 @@ export function ProductDetailPage() {
         productId: product.id,
         name: product.name,
         price: parseFloat(product.price),
-        image: product.images[0]?.imageUrl ?? '',
+        image: product.images?.[0]?.imageUrl ?? '',
       },
       quantity
     );
@@ -66,12 +66,12 @@ export function ProductDetailPage() {
         <div>
           <div className="aspect-square rounded-lg overflow-hidden bg-muted mb-4">
             <img
-              src={product.images[selectedImage]?.imageUrl}
+              src={product.images?.[selectedImage]?.imageUrl}
               alt={product.name}
               className="w-full h-full object-cover"
             />
           </div>
-          {product.images.length > 1 && (
+          {(product.images?.length ?? 0) > 1 && (
             <div className="grid grid-cols-4 gap-2">
               {product.images.map((img, idx) => (
                 <button
