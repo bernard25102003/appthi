@@ -3,6 +3,10 @@ import { z } from 'zod';
 
 dotenv.config();
 
+console.log('[ENV] Loading environment configuration...');
+console.log('[ENV] NODE_ENV:', process.env.NODE_ENV || 'not set');
+console.log('[ENV] PORT:', process.env.PORT || 'not set');
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3000),
@@ -33,9 +37,12 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  console.error('❌ Invalid environment variables:');
+  console.error('[ENV ERROR] ❌ Invalid environment variables:');
   console.error(parsed.error.flatten().fieldErrors);
   process.exit(1);
 }
+
+console.log('[ENV] ✅ All environment variables loaded successfully');
+console.log('[ENV] Running on port:', parsed.data.PORT);
 
 export const env = parsed.data;
