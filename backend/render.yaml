@@ -29,6 +29,6 @@ services:
       - key: IMAGEKIT_URL_ENDPOINT
         sync: false
       - key: CORS_ORIGIN
-        value: https://your-frontend-domain.vercel.app
+        value: https://food.mio.io.vn,https://admin.food.mio.io.vn,http://localhost:5173,http://localhost:5174
       - key: LOG_LEVEL
         value: info
