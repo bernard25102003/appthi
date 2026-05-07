@@ -86,7 +86,7 @@ const bootstrap = async (): Promise<void> => {
 
   const app = createApp();
 
-  const server = app.listen(env.PORT, () => {
+  const server = app.listen(env.PORT, '0.0.0.0', () => {
     logger.info(`🚀 Server running on port ${env.PORT} [${env.NODE_ENV}]`);
     if (env.NODE_ENV !== 'production') {
       logger.info(`📚 API docs: http://localhost:${env.PORT}/api-docs`);
