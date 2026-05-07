@@ -47,7 +47,7 @@ export function ProductsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="mb-8">Sáº£n Pháº©m</h1>
+      <h1 className="mb-8">Sản phẩm</h1>
 
       {/* Filters */}
       <div className="bg-card rounded-lg p-6 mb-8 shadow">
@@ -57,7 +57,7 @@ export function ProductsPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
             <input
               type="text"
-              placeholder="TĂ¬m kiáº¿m sáº£n pháº©m..."
+              placeholder="Tìm kiếm sản phẩm..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
@@ -72,7 +72,7 @@ export function ProductsPage() {
               onChange={(e) => handleCategoryChange(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring appearance-none"
             >
-              <option value="">Táº¥t cáº£ danh má»¥c</option>
+              <option value="">Tất cả danh mục</option>
               {categories.map(cat => (
                 <option key={cat.id} value={cat.id}>
                   {cat.name}
@@ -87,10 +87,10 @@ export function ProductsPage() {
             onChange={(e) => setSortBy(e.target.value as any)}
             className="w-full px-4 py-2 bg-input-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring appearance-none"
           >
-            <option value="sold">BĂ¡n cháº¡y nháº¥t</option>
-            <option value="rating">ÄĂ¡nh giĂ¡ cao nháº¥t</option>
-            <option value="price-asc">GiĂ¡ tÄƒng dáº§n</option>
-            <option value="price-desc">GiĂ¡ giáº£m dáº§n</option>
+            <option value="sold">Bán chạy nhất</option>
+            <option value="rating">Đánh giá cao nhất</option>
+            <option value="price-asc">Giá tăng dần</option>
+            <option value="price-desc">Giá giảm dần</option>
           </select>
         </div>
       </div>
@@ -98,16 +98,16 @@ export function ProductsPage() {
       {/* Products Grid */}
       {products.length === 0 ? (
         <div className="text-center py-16">
-          <div className="text-6xl mb-4">đŸ”</div>
-          <h3 className="mb-2">KhĂ´ng tĂ¬m tháº¥y sáº£n pháº©m</h3>
+          <div className="text-6xl mb-4">😔</div>
+          <h3 className="mb-2">Không tìm thấy sản phẩm</h3>
           <p className="text-muted-foreground">
-            Thá»­ thay Ä‘á»•i bá»™ lá»c hoáº·c tá»« khĂ³a tĂ¬m kiáº¿m
+            Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm
           </p>
         </div>
       ) : (
         <>
           <div className="mb-4 text-muted-foreground">
-            TĂ¬m tháº¥y {total} sáº£n pháº©m
+            Tìm thấy {total} sản phẩm
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {products.map(product => (
@@ -136,10 +136,10 @@ export function ProductsPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-primary font-bold">
-                      {parseFloat(product.price).toLocaleString('vi-VN')}Ä‘
+                      {parseFloat(product.price).toLocaleString('vi-VN')}₫
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      ÄĂ£ bĂ¡n {product.soldCount}
+                      Đã bán {product.soldCount}
                     </span>
                   </div>
                 </div>
