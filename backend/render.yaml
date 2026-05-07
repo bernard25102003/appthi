@@ -4,11 +4,11 @@ services:
     env: node
     plan: starter
     buildCommand: npm ci && npx prisma generate && npm run build
-    startCommand: npx prisma migrate deploy && node dist/main.js
+    startCommand: node dist/main.js
     healthCheckPath: /health
     healthCheckInterval: 10
     maxShutdownDelaySeconds: 30
-    preDeployCommand: npx prisma migrate deploy
+    preDeployCommand: npx prisma db push --skip-generate --force-reset 2>&1 || npx prisma migrate deploy 2>&1
     envVars:
       - key: NODE_ENV
         value: production

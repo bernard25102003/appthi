@@ -6,6 +6,7 @@ import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env';
 import { swaggerSpec } from './config/swagger';
 import { cacheService } from './config/cache';
+import { prisma } from './config/prisma';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { globalRateLimiter } from './middleware/rateLimiter';
 import { requestLogger } from './middleware/requestLogger';
@@ -77,48 +78,71 @@ export const createApp = (): Express => {
 
 // Bootstrap function
 const bootstrap = async (): Promise<void> => {
-  // Connect to Redis (optional – failures are non-fatal)
-  if (env.REDIS_URL) {
-    await cacheService.connect(env.REDIS_URL);
-  } else {
-    logger.info('REDIS_URL not configured – caching disabled');
-  }
+  try {
+    logger.info('Starting bootstrap...');
 
-  const app = createApp();
-
-  const server = app.listen(env.PORT, '0.0.0.0', () => {
-    logger.info(`🚀 Server running on port ${env.PORT} [${env.NODE_ENV}]`);
-    if (env.NODE_ENV !== 'production') {
-      logger.info(`📚 API docs: http://localhost:${env.PORT}/api-docs`);
+    // Connect to Redis (optional – failures are non-fatal)
+    if (env.REDIS_URL) {
+      logger.info('Connecting to Redis...');
+      await cacheService.connect(env.REDIS_URL);
+      logger.info('✅ Redis connected');
+    } else {
+      logger.info('REDIS_URL not configured – caching disabled');
     }
-  });
 
-  // Graceful shutdown
-  const shutdown = async (signal: string) => {
-    logger.info(`${signal} received. Shutting down gracefully...`);
-    await cacheService.disconnect();
-    server.close(() => {
-      logger.info('Server closed');
-      process.exit(0);
+    // Verify database connection
+    logger.info('Verifying database connection...');
+    await prisma.$queryRaw`SELECT 1`;
+    logger.info('✅ Database connected');
+
+    const app = createApp();
+
+    const server = app.listen(env.PORT, '0.0.0.0', () => {
+      logger.info(`🚀 Server running on port ${env.PORT} [${env.NODE_ENV}]`);
+      if (env.NODE_ENV !== 'production') {
+        logger.info(`📚 API docs: http://localhost:${env.PORT}/api-docs`);
+      }
     });
-  };
 
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+    server.on('error', (err) => {
+      logger.error('Server error:', err);
+      process.exit(1);
+    });
 
-  process.on('uncaughtException', (err) => {
-    logger.error('Uncaught exception:', err);
-    process.exit(1);
-  });
+    // Graceful shutdown
+    const shutdown = async (signal: string) => {
+      logger.info(`${signal} received. Shutting down gracefully...`);
+      await cacheService.disconnect();
+      await prisma.$disconnect();
+      server.close(() => {
+        logger.info('Server closed');
+        process.exit(0);
+      });
+    };
 
-  process.on('unhandledRejection', (reason) => {
-    logger.error('Unhandled rejection:', reason);
-    process.exit(1);
-  });
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
+
+    process.on('uncaughtException', (err) => {
+      logger.error('Uncaught exception:', err);
+      process.exit(1);
+    });
+
+    process.on('unhandledRejection', (reason) => {
+      logger.error('Unhandled rejection:', reason);
+      process.exit(1);
+    });
+  } catch (err) {
+    logger.error('Bootstrap failed:', err);
+    throw err;
+  }
 };
 
 // Only start the server when this file is the direct entry point.
 // Prevents the server binding when main.ts is imported by tests.
 if (require.main === module) {
-  bootstrap();
+  bootstrap().catch((err) => {
+    logger.error('Fatal error during bootstrap:', err);
+    process.exit(1);
+  });
 }
