@@ -3,6 +3,7 @@ import { authApi, setTokens, clearTokens, getAccessToken, type AdminUser } from 
 
 interface AdminAuthContextType {
   user: AdminUser | null;
+  loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   isAuthenticated: boolean;
@@ -13,6 +14,7 @@ const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefin
 
 export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AdminUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = getAccessToken();
@@ -25,7 +27,10 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
             clearTokens();
           }
         })
-        .catch(() => clearTokens());
+        .catch(() => clearTokens())
+        .finally(() => setLoading(false));
+    } else {
+      setLoading(false);
     }
   }, []);
 
@@ -52,6 +57,7 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   return (
     <AdminAuthContext.Provider value={{
       user,
+      loading,
       login,
       logout,
       isAuthenticated: !!user,

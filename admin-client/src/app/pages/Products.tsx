@@ -33,12 +33,21 @@ export function Products() {
     categoriesApi.getAll().then(setCategoriesList).catch(() => {});
   }, []);
 
+  // When filters change, reset to page 1 and load. Track with a ref so
+  // the page-change effect below doesn't fire a duplicate request.
+  const skipPageEffect = useRef(false);
+
   useEffect(() => {
+    skipPageEffect.current = true;
     setPage(1);
     loadProducts(1);
   }, [searchTerm, selectedCategory]);
 
   useEffect(() => {
+    if (skipPageEffect.current) {
+      skipPageEffect.current = false;
+      return;
+    }
     loadProducts(page);
   }, [page]);
 

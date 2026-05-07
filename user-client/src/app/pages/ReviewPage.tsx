@@ -11,7 +11,7 @@ export function ReviewPage() {
   const navigate = useNavigate();
   const [order, setOrder] = useState<Order | null>(null);
   const [reviews, setReviews] = useState<Record<string, { rating: number; content: string }>>({});
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!orderId || !isAuthenticated) return;
@@ -61,7 +61,7 @@ export function ReviewPage() {
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
     try {
       await Promise.all(
         itemsWithProduct.map(item =>
@@ -77,7 +77,7 @@ export function ReviewPage() {
     } catch (error: any) {
       toast.error(error?.message ?? 'Đã có lỗi xảy ra');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
@@ -157,10 +157,10 @@ export function ReviewPage() {
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={submitting}
               className="flex-1 bg-primary text-primary-foreground px-6 py-3 rounded-lg hover:bg-primary/90 disabled:opacity-50"
             >
-              {loading ? 'Đang gửi...' : 'Gửi đánh giá'}
+              {submitting ? 'Đang gửi...' : 'Gửi đánh giá'}
             </button>
           </div>
         </form>

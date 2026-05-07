@@ -12,8 +12,10 @@ import { LoginPage } from './pages/LoginPage';
 import { AdminAuthProvider, useAdminAuth } from './contexts/AdminAuthContext';
 
 function AdminApp() {
-  const { isAuthenticated, user, logout } = useAdminAuth();
+  const { isAuthenticated, user, logout, loading } = useAdminAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
+
+  if (loading) return null;
 
   if (!isAuthenticated) {
     return <LoginPage />;
