@@ -7,7 +7,7 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 COPY tsconfig.json ./
 COPY prisma ./prisma/
@@ -30,7 +30,7 @@ RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
 COPY package*.json ./
 # Keep prisma CLI for migrations - don't use --omit=dev
-RUN npm ci && npm cache clean --force
+RUN npm ci --legacy-peer-deps && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
