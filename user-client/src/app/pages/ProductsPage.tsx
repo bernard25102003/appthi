@@ -31,8 +31,8 @@ export function ProductsPage() {
       sortOrder: so,
       limit: 50,
     }).then(res => {
-      setProducts(res.items);
-      setTotal(res.pagination.total);
+      setProducts(res?.items ?? []);
+      setTotal(res?.pagination?.total ?? 0);
     }).catch(() => {});
   }, [searchQuery, selectedCategory, sortBy]);
 

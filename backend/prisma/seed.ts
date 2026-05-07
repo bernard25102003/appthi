@@ -7,12 +7,12 @@ async function main() {
   console.log('🌱 Starting database seed...');
 
   // ─── Admin user ──────────────────────────────────────────────────────────
-  const adminPassword = await bcrypt.hash('Admin@123456', 12);
+  const adminPassword = await bcrypt.hash('Admin@123', 12);
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@ecommerce.com' },
+    where: { email: 'admin@food.com' },
     update: {},
     create: {
-      email: 'admin@ecommerce.com',
+      email: 'admin@food.com',
       password: adminPassword,
       name: 'Quản Trị Viên',
       phone: '0901234567',
@@ -25,12 +25,12 @@ async function main() {
   // ─── Sample users ─────────────────────────────────────────────────────────
   const users = [];
   for (let i = 1; i <= 3; i++) {
-    const userPassword = await bcrypt.hash('User@123456', 12);
+    const userPassword = await bcrypt.hash('User@123', 12);
     const user = await prisma.user.upsert({
-      where: { email: `user${i}@example.com` },
+      where: { email: `user${i}@mem.com` },
       update: {},
       create: {
-        email: `user${i}@example.com`,
+        email: `user${i}@mem.com`,
         password: userPassword,
         name: `Khách Hàng ${i}`,
         phone: `090${1234567 + i}`,

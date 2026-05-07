@@ -28,7 +28,7 @@ export function OrdersPage() {
   useEffect(() => {
     if (!isAuthenticated) return;
     ordersApi.getMyOrders({ limit: 50 })
-      .then(res => setOrders(res.items))
+      .then(res => setOrders(res?.items ?? []))
       .catch(() => {});
   }, [isAuthenticated]);
 

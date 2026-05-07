@@ -22,6 +22,8 @@ export const createApp = (): Express => {
   const app = express();
 
   // ─── Security middleware ──────────────────────────────────────────────────
+  // Trust the first proxy hop so req.ip is the real client IP (needed on Render/Railway)
+  app.set('trust proxy', 1);
   app.use(helmet());
   app.use(
     cors({
