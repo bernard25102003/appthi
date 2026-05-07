@@ -7,14 +7,15 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
-RUN npm install --legacy-peer-deps --omit=dev
+# Install ALL deps (including devDeps: prisma CLI + typescript needed for build)
+RUN npm install --legacy-peer-deps
 
 COPY tsconfig.json ./
 COPY prisma ./prisma/
 COPY src ./src/
 
-# Generate Prisma client with correct OpenSSL
-RUN npx prisma generate
+# Generate Prisma client using local prisma@6.x (not latest via npx)
+RUN ./node_modules/.bin/prisma generate
 RUN npm run build
 
 # ─── Production stage ─────────────────────────────────────────────────────────

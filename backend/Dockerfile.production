@@ -4,13 +4,15 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 COPY package*.json ./
+# npm ci installs all deps (including devDeps: prisma CLI + typescript needed for build)
 RUN npm ci
 
 COPY tsconfig.json ./
 COPY prisma ./prisma/
 COPY src ./src/
 
-RUN npx prisma generate
+# Use local prisma binary to avoid npx downloading a newer incompatible version
+RUN ./node_modules/.bin/prisma generate
 RUN npm run build
 
 # ─── Production stage ─────────────────────────────────────────────────────────
