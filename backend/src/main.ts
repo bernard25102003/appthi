@@ -138,11 +138,8 @@ const bootstrap = async (): Promise<void> => {
   }
 };
 
-// Only start the server when this file is the direct entry point.
-// Prevents the server binding when main.ts is imported by tests.
-if (require.main === module) {
-  bootstrap().catch((err) => {
-    logger.error('Fatal error during bootstrap:', err);
-    process.exit(1);
-  });
-}
+// Start the server
+bootstrap().catch((err) => {
+  logger.error('Fatal error during bootstrap:', err);
+  process.exit(1);
+});
