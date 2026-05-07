@@ -11,7 +11,11 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3000),
 
+  // Pooled connection (PgBouncer) – used by PrismaClient at runtime
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  // Direct connection – used only by Prisma CLI (prisma migrate deploy, db push)
+  // Falls back to DATABASE_URL when not set (e.g. local dev without a pooler)
+  DIRECT_URL: z.string().optional(),
 
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
   JWT_EXPIRE: z.string().default('7d'),
