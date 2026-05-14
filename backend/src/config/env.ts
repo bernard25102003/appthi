@@ -39,6 +39,7 @@ const envSchema = z.object({
   VNPAY_HASH_SECRET: z.string().optional(),
   VNPAY_URL: z.string().default('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
   VNPAY_RETURN_URL: z.string().default('http://localhost:5173/vnpay-return'),
+  VNPAY_EXPIRE_DURATION: z.coerce.number().default(30), // minutes
 
   REDIS_URL: z.string().optional(),
 });

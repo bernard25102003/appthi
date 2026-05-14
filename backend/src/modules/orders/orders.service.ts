@@ -2,6 +2,7 @@ import { Prisma, OrderStatus, PaymentMethod } from '@prisma/client';
 import crypto from 'crypto';
 import prisma from '../../config/prisma';
 import { env } from '../../config/env';
+import { logger } from '../../utils/logger';
 import {
   createNotFoundError,
   createForbiddenError,
@@ -132,7 +133,16 @@ export class OrdersService {
 
     const amount = order.totalPrice.mul(100).toFixed(0);
     const createDate = this.formatVnpDate();
-    const expireDate = this.formatVnpDate(new Date(Date.now() + 15 * 60 * 1000));
+    const expireDate = this.formatVnpDate(new Date(Date.now() + env.VNPAY_EXPIRE_DURATION * 60 * 1000));
+
+    logger.info(`[VNPAY] Building payment URL for order ${order.id}`, {
+      orderNumber: order.orderNumber,
+      amount,
+      expireDuration: env.VNPAY_EXPIRE_DURATION,
+      createDate,
+      expireDate,
+      currentTime: new Date().toISOString(),
+    });
 
     const params: Record<string, string> = {
       vnp_Version: '2.1.0',
@@ -248,6 +258,8 @@ export class OrdersService {
       ipAddress,
     );
 
+    logger.info(`[VNPAY] Payment URL created successfully for order ${order.id}`);
+
     return { order, paymentUrl };
   }
 
@@ -259,8 +271,14 @@ export class OrdersService {
     const responseCode = query.vnp_ResponseCode;
 
     if (!secureHash || !orderId || !responseCode) {
+      logger.error(`[VNPAY] Missing return parameters for order ${orderId}`, { query });
       throw createValidationError('Missing VNPAY return parameters');
     }
+
+    logger.info(`[VNPAY] Verifying payment return for order ${orderId}`, {
+      responseCode,
+      currentTime: new Date().toISOString(),
+    });
 
     const paramsToSign: Record<string, string> = {};
     Object.keys(query).forEach((key) => {
@@ -271,6 +289,7 @@ export class OrdersService {
 
     const { secureHash: expectedHash } = this.sortAndSignVnpayParams(paramsToSign);
     if (expectedHash !== secureHash) {
+      logger.warn(`[VNPAY] Invalid secure hash for order ${orderId}`);
       return {
         orderId,
         success: false,
@@ -280,6 +299,7 @@ export class OrdersService {
 
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order) {
+      logger.error(`[VNPAY] Order not found: ${orderId}`);
       return {
         orderId,
         success: false,
@@ -293,6 +313,7 @@ export class OrdersService {
           where: { id: order.id },
           data: { status: 'CONFIRMED', confirmedAt: new Date() },
         });
+        logger.info(`[VNPAY] Order ${orderId} confirmed successfully`);
       }
 
       return {
@@ -301,6 +322,8 @@ export class OrdersService {
         message: 'Thanh toán thành công',
       };
     }
+
+    logger.warn(`[VNPAY] Payment failed for order ${orderId} with code ${responseCode}`);
 
     return {
       orderId: order.id,
