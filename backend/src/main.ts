@@ -92,8 +92,13 @@ export const createApp = (): Express => {
 // Bootstrap function
 const bootstrap = async (): Promise<void> => {
   const port = env.PORT || 3000;
+  const startTime = new Date();
   console.log(`[STARTUP] Starting bootstrap on port ${port}...`);
+  console.log(`[STARTUP] Server start time: ${startTime.toISOString()} (Timestamp: ${startTime.getTime()})`);
+  console.log(`[STARTUP] Timezone: ${process.env.TZ || 'not set (default: UTC)'}`);
   logger.info(`Starting bootstrap on port ${port}...`);
+  logger.info(`Server start time: ${startTime.toISOString()} (Timestamp: ${startTime.getTime()})`);
+  logger.info(`Timezone: ${process.env.TZ || 'not set (default: UTC)'}`);
 
   const app = createApp();
 

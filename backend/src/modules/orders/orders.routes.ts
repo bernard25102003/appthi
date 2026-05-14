@@ -111,4 +111,30 @@ router.patch(
   asyncHandler((req, res) => controller.cancelMyOrder(req, res)),
 );
 
+// ─── DEBUG: Check VNPAY Configuration (TEMPORARY) ───────────────────────────
+
+/**
+ * GET /api/orders/debug/vnpay-config
+ * Debug endpoint to check VNPAY configuration
+ * Remove this after fixing payment issues
+ */
+router.get(
+  '/debug/vnpay-config',
+  asyncHandler(async (req, res) => {
+    const { env } = await import('../../config/env');
+    res.json({
+      DEBUG_INFO: 'This endpoint is for debugging only and should be removed after fixing VNPAY issues',
+      VNPAY_TMN_CODE: env.VNPAY_TMN_CODE ? '✅ SET' : '❌ MISSING',
+      VNPAY_HASH_SECRET: env.VNPAY_HASH_SECRET ? '✅ SET' : '❌ MISSING',
+      VNPAY_EXPIRE_DURATION: `${env.VNPAY_EXPIRE_DURATION} minutes`,
+      VNPAY_URL: env.VNPAY_URL,
+      VNPAY_RETURN_URL: env.VNPAY_RETURN_URL,
+      NODE_ENV: env.NODE_ENV,
+      SERVER_TIME: new Date().toISOString(),
+      SERVER_TIMESTAMP: Date.now(),
+      TIMEZONE: process.env.TZ || 'not set (default: UTC)',
+    });
+  }),
+);
+
 export default router;

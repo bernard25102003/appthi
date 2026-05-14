@@ -132,8 +132,21 @@ export class OrdersService {
     this.ensureVnpayConfig();
 
     const amount = order.totalPrice.mul(100).toFixed(0);
-    const createDate = this.formatVnpDate();
+    const nowDate = new Date();
+    const createDate = this.formatVnpDate(nowDate);
     const expireDate = this.formatVnpDate(new Date(Date.now() + env.VNPAY_EXPIRE_DURATION * 60 * 1000));
+
+    // Detailed timestamp logging for debugging
+    logger.info(`[VNPAY] Timestamp Debug for order ${order.id}`, {
+      serverNow: new Date().toISOString(),
+      serverTimestamp: Date.now(),
+      createDateFormatted: createDate,
+      expireDateFormatted: expireDate,
+      expireDurationMinutes: env.VNPAY_EXPIRE_DURATION,
+      expireDurationMs: env.VNPAY_EXPIRE_DURATION * 60 * 1000,
+      calculatedExpireTime: new Date(Date.now() + env.VNPAY_EXPIRE_DURATION * 60 * 1000).toISOString(),
+      timezone: process.env.TZ || 'not set',
+    });
 
     logger.info(`[VNPAY] Building payment URL for order ${order.id}`, {
       orderNumber: order.orderNumber,
