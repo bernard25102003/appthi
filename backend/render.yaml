@@ -40,3 +40,13 @@ services:
         value: 20
       - key: LOG_LEVEL
         value: info
+      - key: VNPAY_TMN_CODE
+        sync: false
+      - key: VNPAY_HASH_SECRET
+        sync: false
+      - key: VNPAY_URL
+        value: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
+      - key: VNPAY_RETURN_URL
+        value: https://food.mio.io.vn/vnpay-return
+      - key: VNPAY_EXPIRE_DURATION
+        value: 30
