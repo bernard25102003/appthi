@@ -136,12 +136,14 @@ export class OrdersService {
   }
 
   private formatVnpDate(date = new Date()) {
-    const yyyy = date.getFullYear();
-    const MM = `${date.getMonth() + 1}`.padStart(2, '0');
-    const dd = `${date.getDate()}`.padStart(2, '0');
-    const hh = `${date.getHours()}`.padStart(2, '0');
-    const mm = `${date.getMinutes()}`.padStart(2, '0');
-    const ss = `${date.getSeconds()}`.padStart(2, '0');
+    // VNPAY requires Vietnam Standard Time (UTC+7) regardless of server timezone
+    const vnTime = new Date(date.getTime() + 7 * 60 * 60 * 1000);
+    const yyyy = vnTime.getUTCFullYear();
+    const MM = `${vnTime.getUTCMonth() + 1}`.padStart(2, '0');
+    const dd = `${vnTime.getUTCDate()}`.padStart(2, '0');
+    const hh = `${vnTime.getUTCHours()}`.padStart(2, '0');
+    const mm = `${vnTime.getUTCMinutes()}`.padStart(2, '0');
+    const ss = `${vnTime.getUTCSeconds()}`.padStart(2, '0');
     return `${yyyy}${MM}${dd}${hh}${mm}${ss}`;
   }
 
