@@ -106,14 +106,31 @@ export class OrdersService {
 
   private sortAndSignVnpayParams(params: Record<string, string>) {
     const sortedKeys = Object.keys(params).sort();
+    
+    // Build payload the exact way VNPAY expects (key=value&key2=value2...)
     const payload = sortedKeys
-      .map((key) => `${key}=${encodeURIComponent(params[key]).replace(/%20/g, '+')}`)
+      .map((key) => {
+        const value = params[key];
+        // For numeric parameters like amount, don't encode
+        if (key === 'vnp_Amount') {
+          return `${key}=${value}`;
+        }
+        // For URLs and other values, use standard encoding
+        return `${key}=${encodeURIComponent(value).replace(/%20/g, '+')}`;
+      })
       .join('&');
+
+    logger.debug(`[VNPAY] Payload to sign:`, payload);
 
     const secureHash = crypto
       .createHmac('sha512', env.VNPAY_HASH_SECRET!)
       .update(Buffer.from(payload, 'utf-8'))
       .digest('hex');
+
+    logger.debug(`[VNPAY] Secure hash generated`, { 
+      hashLength: secureHash.length,
+      hashType: 'sha512'
+    });
 
     return { payload, secureHash };
   }
@@ -131,10 +148,14 @@ export class OrdersService {
   private buildVnpayPaymentUrl(order: { id: string; orderNumber: string; totalPrice: Prisma.Decimal }, ipAddress: string) {
     this.ensureVnpayConfig();
 
-    const amount = order.totalPrice.mul(100).toFixed(0);
+    // Fixed: Use Math.floor instead of toFixed to ensure integer string
+    const amount = Math.floor(order.totalPrice.toNumber() * 100).toString();
     const nowDate = new Date();
     const createDate = this.formatVnpDate(nowDate);
     const expireDate = this.formatVnpDate(new Date(Date.now() + env.VNPAY_EXPIRE_DURATION * 60 * 1000));
+
+    // Use orderNumber as TxnRef instead of order.id for better VNPAY compatibility
+    const txnRef = order.orderNumber || order.id;
 
     // Detailed timestamp logging for debugging
     logger.info(`[VNPAY] Timestamp Debug for order ${order.id}`, {
@@ -151,9 +172,11 @@ export class OrdersService {
     logger.info(`[VNPAY] Building payment URL for order ${order.id}`, {
       orderNumber: order.orderNumber,
       amount,
+      amountType: typeof amount,
       expireDuration: env.VNPAY_EXPIRE_DURATION,
       createDate,
       expireDate,
+      txnRef,
       currentTime: new Date().toISOString(),
     });
 
@@ -163,7 +186,7 @@ export class OrdersService {
       vnp_TmnCode: env.VNPAY_TMN_CODE!,
       vnp_Amount: amount,
       vnp_CurrCode: 'VND',
-      vnp_TxnRef: order.id,
+      vnp_TxnRef: txnRef,
       vnp_OrderInfo: `Thanh toan don hang ${order.orderNumber}`,
       vnp_OrderType: 'other',
       vnp_Locale: 'vn',
@@ -173,8 +196,14 @@ export class OrdersService {
       vnp_ExpireDate: expireDate,
     };
 
+    logger.debug(`[VNPAY] Payment parameters before hashing:`, params);
     const { payload, secureHash } = this.sortAndSignVnpayParams(params);
-    return `${env.VNPAY_URL}?${payload}&vnp_SecureHash=${secureHash}`;
+    logger.debug(`[VNPAY] Signed payload:`, { payload, secureHash });
+    
+    const paymentUrl = `${env.VNPAY_URL}?${payload}&vnp_SecureHash=${secureHash}`;
+    logger.info(`[VNPAY] Payment URL created: ${paymentUrl}`);
+    
+    return paymentUrl;
   }
 
   // ─── Cart validation ──────────────────────────────────────────────────────

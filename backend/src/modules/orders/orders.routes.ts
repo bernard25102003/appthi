@@ -137,4 +137,54 @@ router.get(
   }),
 );
 
+/**
+ * GET /api/orders/debug/vnpay-params
+ * Debug endpoint to simulate VNPAY payment URL generation
+ * Pass ?amount=100000&orderNumber=TEST001 to test
+ * Remove this after fixing payment issues
+ */
+router.get(
+  '/debug/vnpay-params',
+  asyncHandler(async (req, res) => {
+    const { env } = await import('../../config/env');
+    const { OrdersService } = await import('./orders.service');
+    
+    try {
+      const amount = req.query.amount ? String(req.query.amount) : '100000';
+      const orderNumber = req.query.orderNumber ? String(req.query.orderNumber) : 'TEST001';
+      
+      const service = new OrdersService();
+      
+      // Simulate payment URL generation
+      const mockOrder = {
+        id: 'debug-test-id',
+        orderNumber,
+        totalPrice: new (await import('@prisma/client')).Prisma.Decimal(parseInt(amount) / 100),
+      };
+      
+      // @ts-ignore - accessing private method for debugging
+      const paymentUrl = service.buildVnpayPaymentUrl(mockOrder, '127.0.0.1');
+      
+      // Parse URL to show parameters
+      const url = new URL(paymentUrl, 'http://dummy.com');
+      const params: Record<string, string> = {};
+      url.searchParams.forEach((value, key) => {
+        params[key] = value;
+      });
+      
+      res.json({
+        DEBUG_INFO: 'Simulated VNPAY payment URL generation',
+        fullPaymentUrl: paymentUrl,
+        parameters: params,
+        note: 'This endpoint is for debugging - remove after fixing VNPAY issues',
+      });
+    } catch (error: any) {
+      res.status(400).json({
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      });
+    }
+  }),
+);
+
 export default router;
