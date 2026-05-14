@@ -120,7 +120,7 @@ router.patch(
  */
 router.get(
   '/debug/vnpay-config',
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (_req, res) => {
     const { env } = await import('../../config/env');
     res.json({
       DEBUG_INFO: 'This endpoint is for debugging only and should be removed after fixing VNPAY issues',
