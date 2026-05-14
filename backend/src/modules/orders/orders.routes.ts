@@ -22,6 +22,26 @@ router.post(
 );
 
 /**
+ * POST /api/orders/vnpay/create-payment-url
+ * Create order and return VNPAY payment URL
+ */
+router.post(
+  '/vnpay/create-payment-url',
+  authenticate,
+  validate(createOrderSchema),
+  asyncHandler((req, res) => controller.createVnpayPayment(req, res)),
+);
+
+/**
+ * GET /api/orders/vnpay/verify-return
+ * Verify VNPAY return data
+ */
+router.get(
+  '/vnpay/verify-return',
+  asyncHandler((req, res) => controller.verifyVnpayReturn(req, res)),
+);
+
+/**
  * GET /api/orders
  * List the authenticated user's own orders
  */

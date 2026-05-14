@@ -60,16 +60,17 @@ export function ChangePasswordPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-16">
+    <div className="container mx-auto px-4 py-16 md:py-20">
       <div className="max-w-md mx-auto">
         <div className="text-center mb-8">
-          <h1 className="mb-2">Đổi Mật Khẩu</h1>
+          <div className="text-xs uppercase tracking-[0.3em] text-primary font-bold mb-2">Security</div>
+          <h1 className="mb-2 text-4xl">Đổi Mật Khẩu</h1>
           <p className="text-muted-foreground">
             Cập nhật mật khẩu của bạn
           </p>
         </div>
 
-        <div className="bg-card rounded-lg p-8 shadow">
+        <div className="bg-card border border-border rounded-2xl p-8 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block mb-2">Mật khẩu hiện tại *</label>

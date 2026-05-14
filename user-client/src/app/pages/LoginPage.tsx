@@ -53,16 +53,17 @@ export function LoginPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-16">
+    <div className="container mx-auto px-4 py-16 md:py-20">
       <div className="max-w-md mx-auto">
         <div className="text-center mb-8">
-          <h1 className="mb-2">Đăng Nhập</h1>
+          <div className="text-xs uppercase tracking-[0.3em] text-primary font-bold mb-2">Welcome Back</div>
+          <h1 className="mb-2 text-4xl">Đăng Nhập</h1>
           <p className="text-muted-foreground">
             Chào mừng bạn quay trở lại!
           </p>
         </div>
 
-        <div className="bg-card rounded-lg p-8 shadow">
+        <div className="bg-card border border-border rounded-2xl p-8 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block mb-2">Email *</label>

@@ -13,6 +13,7 @@ import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { OrdersPage } from './pages/OrdersPage';
 import { OrderDetailPage } from './pages/OrderDetailPage';
 import { ReviewPage } from './pages/ReviewPage';
+import { VnpayReturnPage } from './pages/VnpayReturnPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
 export const router = createBrowserRouter([
@@ -25,6 +26,7 @@ export const router = createBrowserRouter([
       { path: 'products/:id', Component: ProductDetailPage },
       { path: 'cart', Component: CartPage },
       { path: 'checkout', Component: CheckoutPage },
+      { path: 'vnpay-return', Component: VnpayReturnPage },
       { path: 'order-success/:orderId', Component: OrderSuccessPage },
       { path: 'login', Component: LoginPage },
       { path: 'register', Component: RegisterPage },

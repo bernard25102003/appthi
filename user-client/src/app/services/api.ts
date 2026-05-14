@@ -248,9 +248,26 @@ export interface CreateOrderData {
   notes?: string;
 }
 
+export interface CreateVnpayPaymentResponse {
+  order: Order;
+  paymentUrl: string;
+}
+
+export interface VerifyVnpayReturnResponse {
+  orderId?: string;
+  success: boolean;
+  message: string;
+}
+
 export const ordersApi = {
   create: (data: CreateOrderData) =>
     request<Order>('/orders', { method: 'POST', body: data }),
+
+  createVnpayPayment: (data: CreateOrderData) =>
+    request<CreateVnpayPaymentResponse>('/orders/vnpay/create-payment-url', { method: 'POST', body: data }),
+
+  verifyVnpayReturn: (queryString: string) =>
+    request<VerifyVnpayReturnResponse>(`/orders/vnpay/verify-return${queryString ? `?${queryString}` : ''}`, { auth: false }),
 
   getMyOrders: (query: { page?: number; limit?: number; status?: OrderStatus } = {}) => {
     const params = new URLSearchParams();

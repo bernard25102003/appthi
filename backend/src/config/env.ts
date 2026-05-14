@@ -35,6 +35,11 @@ const envSchema = z.object({
 
   CORS_ORIGIN: z.string().default('http://localhost:5173,http://localhost:5174'),
 
+  VNPAY_TMN_CODE: z.string().optional(),
+  VNPAY_HASH_SECRET: z.string().optional(),
+  VNPAY_URL: z.string().default('https://sandbox.vnpayment.vn/paymentv2/vpcpay.html'),
+  VNPAY_RETURN_URL: z.string().default('http://localhost:5173/vnpay-return'),
+
   REDIS_URL: z.string().optional(),
 });
 

@@ -11,6 +11,7 @@ interface CartContextType {
   clearCart: () => void;
   totalPrice: number;
   createOrder: (data: { recipientName: string; recipientPhone: string; recipientAddress: string; paymentMethod: PaymentMethod; notes?: string }) => Promise<Order>;
+  createVnpayPayment: (data: { recipientName: string; recipientPhone: string; recipientAddress: string; notes?: string }) => Promise<{ order: Order; paymentUrl: string }>;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
@@ -75,8 +76,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return order;
   };
 
+  const createVnpayPayment = async (data: {
+    recipientName: string;
+    recipientPhone: string;
+    recipientAddress: string;
+    notes?: string;
+  }) => {
+    const result = await ordersApi.createVnpayPayment({
+      items: items.map(item => ({ productId: item.productId, quantity: item.quantity })),
+      paymentMethod: 'BANK_TRANSFER',
+      recipientName: data.recipientName,
+      recipientPhone: data.recipientPhone,
+      recipientAddress: data.recipientAddress,
+      notes: data.notes,
+    });
+    clearCart();
+    return result;
+  };
+
   return (
-    <CartContext.Provider value={{ items, addToCart, updateQuantity, removeFromCart, clearCart, totalPrice, createOrder }}>
+    <CartContext.Provider value={{ items, addToCart, updateQuantity, removeFromCart, clearCart, totalPrice, createOrder, createVnpayPayment }}>
       {children}
     </CartContext.Provider>
   );

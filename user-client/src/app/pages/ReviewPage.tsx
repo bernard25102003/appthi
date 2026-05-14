@@ -82,11 +82,11 @@ export function ReviewPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto max-w-6xl px-4 py-10">
       <div className="max-w-2xl mx-auto">
-        <h1 className="mb-8">Đánh Giá Đơn Hàng</h1>
+        <h1 className="mb-8 text-3xl md:text-4xl">Đánh Giá Đơn Hàng</h1>
 
-        <div className="bg-card rounded-lg p-6 shadow mb-6">
+        <div className="bg-card border border-border rounded-xl p-6 shadow-sm mb-6">
           <div className="text-sm text-muted-foreground mb-2">Đơn hàng</div>
           <div className="font-medium">#{order.orderNumber}</div>
         </div>
@@ -96,7 +96,7 @@ export function ReviewPage() {
             const review = reviews[item.productId!] ?? { rating: 0, content: '' };
 
             return (
-              <div key={item.productId} className="bg-card rounded-lg p-6 shadow">
+              <div key={item.productId} className="bg-card border border-border rounded-xl p-6 shadow-sm">
                 <div className="flex gap-4 mb-4">
                   <div className="w-20 h-20 rounded bg-muted overflow-hidden flex-shrink-0">
                     {item.productImage && (

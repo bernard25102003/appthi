@@ -24,9 +24,9 @@ export function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <div className="container mx-auto px-4 py-16">
+      <div className="container mx-auto px-4 py-16 md:py-20">
         <div className="max-w-md mx-auto text-center">
-          <div className="bg-card rounded-lg p-8 shadow">
+          <div className="bg-card border border-border rounded-2xl p-8 shadow-sm">
             <div className="w-16 h-16 bg-secondary/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <span className="text-4xl">📧</span>
             </div>
@@ -47,16 +47,17 @@ export function ForgotPasswordPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-16">
+    <div className="container mx-auto px-4 py-16 md:py-20">
       <div className="max-w-md mx-auto">
         <div className="text-center mb-8">
-          <h1 className="mb-2">Quên Mật Khẩu</h1>
+          <div className="text-xs uppercase tracking-[0.3em] text-primary font-bold mb-2">Account Recovery</div>
+          <h1 className="mb-2 text-4xl">Quên Mật Khẩu</h1>
           <p className="text-muted-foreground">
             Nhập email để nhận link đặt lại mật khẩu
           </p>
         </div>
 
-        <div className="bg-card rounded-lg p-8 shadow">
+        <div className="bg-card border border-border rounded-2xl p-8 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block mb-2">Email *</label>

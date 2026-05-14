@@ -1,9 +1,12 @@
 import { Prisma, OrderStatus, PaymentMethod } from '@prisma/client';
+import crypto from 'crypto';
 import prisma from '../../config/prisma';
+import { env } from '../../config/env';
 import {
   createNotFoundError,
   createForbiddenError,
   createBusinessError,
+  createValidationError,
 } from '../../types/error';
 import { generateOrderNumber, paginate, getSkip } from '../../utils/helpers';
 
@@ -21,6 +24,17 @@ export interface CreateOrderDto {
   recipientPhone: string;
   recipientAddress: string;
   notes?: string;
+}
+
+export interface CreateVnpayPaymentResult {
+  order: Awaited<ReturnType<OrdersService['createOrder']>>;
+  paymentUrl: string;
+}
+
+export interface VerifyVnpayReturnResult {
+  orderId?: string;
+  success: boolean;
+  message: string;
 }
 
 export interface ListOrdersQuery {
@@ -81,6 +95,65 @@ const ORDER_DETAIL_SELECT = {
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export class OrdersService {
+  private ensureVnpayConfig() {
+    if (!env.VNPAY_TMN_CODE || !env.VNPAY_HASH_SECRET) {
+      throw createValidationError(
+        'VNPAY is not configured. Please set VNPAY_TMN_CODE and VNPAY_HASH_SECRET.',
+      );
+    }
+  }
+
+  private sortAndSignVnpayParams(params: Record<string, string>) {
+    const sortedKeys = Object.keys(params).sort();
+    const payload = sortedKeys
+      .map((key) => `${key}=${encodeURIComponent(params[key]).replace(/%20/g, '+')}`)
+      .join('&');
+
+    const secureHash = crypto
+      .createHmac('sha512', env.VNPAY_HASH_SECRET!)
+      .update(Buffer.from(payload, 'utf-8'))
+      .digest('hex');
+
+    return { payload, secureHash };
+  }
+
+  private formatVnpDate(date = new Date()) {
+    const yyyy = date.getFullYear();
+    const MM = `${date.getMonth() + 1}`.padStart(2, '0');
+    const dd = `${date.getDate()}`.padStart(2, '0');
+    const hh = `${date.getHours()}`.padStart(2, '0');
+    const mm = `${date.getMinutes()}`.padStart(2, '0');
+    const ss = `${date.getSeconds()}`.padStart(2, '0');
+    return `${yyyy}${MM}${dd}${hh}${mm}${ss}`;
+  }
+
+  private buildVnpayPaymentUrl(order: { id: string; orderNumber: string; totalPrice: Prisma.Decimal }, ipAddress: string) {
+    this.ensureVnpayConfig();
+
+    const amount = order.totalPrice.mul(100).toFixed(0);
+    const createDate = this.formatVnpDate();
+    const expireDate = this.formatVnpDate(new Date(Date.now() + 15 * 60 * 1000));
+
+    const params: Record<string, string> = {
+      vnp_Version: '2.1.0',
+      vnp_Command: 'pay',
+      vnp_TmnCode: env.VNPAY_TMN_CODE!,
+      vnp_Amount: amount,
+      vnp_CurrCode: 'VND',
+      vnp_TxnRef: order.id,
+      vnp_OrderInfo: `Thanh toan don hang ${order.orderNumber}`,
+      vnp_OrderType: 'other',
+      vnp_Locale: 'vn',
+      vnp_ReturnUrl: env.VNPAY_RETURN_URL,
+      vnp_IpAddr: ipAddress,
+      vnp_CreateDate: createDate,
+      vnp_ExpireDate: expireDate,
+    };
+
+    const { payload, secureHash } = this.sortAndSignVnpayParams(params);
+    return `${env.VNPAY_URL}?${payload}&vnp_SecureHash=${secureHash}`;
+  }
+
   // ─── Cart validation ──────────────────────────────────────────────────────
 
   private async validateAndPriceCart(items: CartItemInput[]) {
@@ -163,6 +236,77 @@ export class OrdersService {
     });
 
     return order;
+  }
+
+  async createOrderWithVnpay(userId: string, dto: CreateOrderDto, ipAddress: string): Promise<CreateVnpayPaymentResult> {
+    const order = await this.createOrder(userId, {
+      ...dto,
+      paymentMethod: 'BANK_TRANSFER',
+    });
+    const paymentUrl = this.buildVnpayPaymentUrl(
+      { id: order.id, orderNumber: order.orderNumber, totalPrice: new Prisma.Decimal(order.totalPrice) },
+      ipAddress,
+    );
+
+    return { order, paymentUrl };
+  }
+
+  async verifyVnpayReturn(query: Record<string, string | undefined>): Promise<VerifyVnpayReturnResult> {
+    this.ensureVnpayConfig();
+
+    const secureHash = query.vnp_SecureHash;
+    const orderId = query.vnp_TxnRef;
+    const responseCode = query.vnp_ResponseCode;
+
+    if (!secureHash || !orderId || !responseCode) {
+      throw createValidationError('Missing VNPAY return parameters');
+    }
+
+    const paramsToSign: Record<string, string> = {};
+    Object.keys(query).forEach((key) => {
+      const value = query[key];
+      if (!value || key === 'vnp_SecureHash' || key === 'vnp_SecureHashType') return;
+      paramsToSign[key] = value;
+    });
+
+    const { secureHash: expectedHash } = this.sortAndSignVnpayParams(paramsToSign);
+    if (expectedHash !== secureHash) {
+      return {
+        orderId,
+        success: false,
+        message: 'Chữ ký VNPAY không hợp lệ',
+      };
+    }
+
+    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) {
+      return {
+        orderId,
+        success: false,
+        message: 'Không tìm thấy đơn hàng',
+      };
+    }
+
+    if (responseCode === '00') {
+      if (order.status === 'PENDING') {
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { status: 'CONFIRMED', confirmedAt: new Date() },
+        });
+      }
+
+      return {
+        orderId: order.id,
+        success: true,
+        message: 'Thanh toán thành công',
+      };
+    }
+
+    return {
+      orderId: order.id,
+      success: false,
+      message: `Thanh toán thất bại (Mã lỗi: ${responseCode})`,
+    };
   }
 
   // ─── Get order by ID ──────────────────────────────────────────────────────

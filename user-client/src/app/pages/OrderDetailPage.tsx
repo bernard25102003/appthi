@@ -38,7 +38,7 @@ export function OrderDetailPage() {
 
   if (notFound) {
     return (
-      <div className="container mx-auto px-4 py-16 text-center">
+      <div className="container mx-auto max-w-4xl px-4 py-16 text-center">
         <h2 className="mb-4">Không tìm thấy đơn hàng</h2>
         <Link
           to="/orders"
@@ -59,14 +59,14 @@ export function OrderDetailPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto max-w-6xl px-4 py-10">
       <div className="mb-6">
         <Link to="/orders" className="text-primary hover:underline">
           ← Quay lại lịch sử đơn hàng
         </Link>
       </div>
 
-      <div className="bg-card rounded-lg p-6 shadow mb-6">
+      <div className="bg-card border border-border rounded-xl p-6 shadow-sm mb-6">
         <div className="flex items-start justify-between mb-6">
           <div>
             <h1 className="mb-2">Đơn hàng #{order.orderNumber}</h1>

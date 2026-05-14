@@ -13,6 +13,22 @@ export class OrdersController {
     sendCreated(res, order, 'Order created successfully');
   }
 
+  async createVnpayPayment(req: Request, res: Response): Promise<void> {
+    const forwardedIp = req.headers['x-forwarded-for'];
+    const clientIp = Array.isArray(forwardedIp)
+      ? forwardedIp[0]
+      : (forwardedIp?.split(',')[0]?.trim() ?? req.socket.remoteAddress ?? '127.0.0.1');
+
+    const result = await ordersService.createOrderWithVnpay(req.user!.id, req.body, clientIp);
+    sendCreated(res, result, 'VNPAY payment URL created');
+  }
+
+  async verifyVnpayReturn(req: Request, res: Response): Promise<void> {
+    const query = req.query as Record<string, string | undefined>;
+    const result = await ordersService.verifyVnpayReturn(query);
+    sendSuccess(res, result, 'VNPAY return verified');
+  }
+
   // ─── User: list my orders ──────────────────────────────────────────────────
 
   async listMyOrders(req: Request, res: Response): Promise<void> {
