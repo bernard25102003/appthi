@@ -146,7 +146,6 @@ router.get(
 router.get(
   '/debug/vnpay-params',
   asyncHandler(async (req, res) => {
-    const { env } = await import('../../config/env');
     const { OrdersService } = await import('./orders.service');
     
     try {
