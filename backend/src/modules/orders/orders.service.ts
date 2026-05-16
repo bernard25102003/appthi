@@ -34,6 +34,7 @@ export interface CreateVnpayPaymentResult {
 
 export interface VerifyVnpayReturnResult {
   orderId?: string;
+  orderNumber?: string;
   success: boolean;
   message: string;
 }
@@ -133,6 +134,29 @@ export class OrdersService {
     });
 
     return { payload, secureHash };
+  }
+
+  private verifyVnpaySignature(rawQueryString: string, providedHash: string): boolean {
+    // Remove vnp_SecureHash and vnp_SecureHashType from query string
+    const cleanQueryString = rawQueryString
+      .split('&')
+      .filter(param => !param.startsWith('vnp_SecureHash') && !param.startsWith('vnp_SecureHashType'))
+      .join('&');
+
+    // Compute HMAC-SHA512
+    const computedHash = crypto
+      .createHmac('sha512', env.VNPAY_HASH_SECRET!)
+      .update(Buffer.from(cleanQueryString, 'utf-8'))
+      .digest('hex');
+
+    logger.debug(`[VNPAY] Signature verification`, {
+      cleanQuery: cleanQueryString,
+      providedHash: providedHash?.substring(0, 16) + '...',
+      computedHash: computedHash?.substring(0, 16) + '...',
+      match: computedHash === providedHash,
+    });
+
+    return computedHash === providedHash;
   }
 
   private formatVnpDate(date = new Date()) {
@@ -260,6 +284,11 @@ export class OrdersService {
   async createOrder(userId: string, dto: CreateOrderDto) {
     const { validatedItems, totalPrice } = await this.validateAndPriceCart(dto.items);
 
+    // Validate order total must be positive
+    if (totalPrice.lte(0)) {
+      throw createValidationError('Order total must be greater than 0');
+    }
+
     const orderNumber = generateOrderNumber();
 
     const order = await prisma.$transaction(async (tx) => {
@@ -307,7 +336,7 @@ export class OrdersService {
     return { order, paymentUrl };
   }
 
-  async verifyVnpayReturn(query: Record<string, string | undefined>): Promise<VerifyVnpayReturnResult> {
+  async verifyVnpayReturn(query: Record<string, string | undefined>, rawQueryString: string): Promise<VerifyVnpayReturnResult> {
     this.ensureVnpayConfig();
 
     const secureHash = query.vnp_SecureHash;
@@ -324,15 +353,8 @@ export class OrdersService {
       currentTime: new Date().toISOString(),
     });
 
-    const paramsToSign: Record<string, string> = {};
-    Object.keys(query).forEach((key) => {
-      const value = query[key];
-      if (!value || key === 'vnp_SecureHash' || key === 'vnp_SecureHashType') return;
-      paramsToSign[key] = value;
-    });
-
-    const { secureHash: expectedHash } = this.sortAndSignVnpayParams(paramsToSign);
-    if (expectedHash !== secureHash) {
+    // Verify signature using raw query string (no encoding issues)
+    if (!this.verifyVnpaySignature(rawQueryString, secureHash)) {
       logger.warn(`[VNPAY] Invalid secure hash for order ${orderId}`);
       return {
         orderId,
@@ -341,9 +363,12 @@ export class OrdersService {
       };
     }
 
-    const order = await prisma.order.findUnique({ where: { id: orderId } });
+    // IMPORTANT: vnp_TxnRef contains orderNumber, not id!
+    // We must search by orderNumber (which is @unique)
+    logger.info(`[VNPAY] Looking for order by orderNumber: ${orderId} (vnp_TxnRef)`);
+    const order = await prisma.order.findUnique({ where: { orderNumber: orderId } });
     if (!order) {
-      logger.error(`[VNPAY] Order not found: ${orderId}`);
+      logger.error(`[VNPAY] Order not found by orderNumber: ${orderId}`);
       return {
         orderId,
         success: false,
@@ -351,28 +376,39 @@ export class OrdersService {
       };
     }
 
-    if (responseCode === '00') {
-      if (order.status === 'PENDING') {
-        await prisma.order.update({
-          where: { id: order.id },
-          data: { status: 'CONFIRMED', confirmedAt: new Date() },
-        });
-        logger.info(`[VNPAY] Order ${orderId} confirmed successfully`);
-      }
+    logger.info(`[VNPAY] Order found successfully: id=${order.id}, orderNumber=${order.orderNumber}`);
 
+    // Check if payment failed - early return
+    if (responseCode !== '00') {
+      logger.warn(`[VNPAY] Payment failed for order ${order.orderNumber} with code ${responseCode}`);
       return {
         orderId: order.id,
-        success: true,
-        message: 'Thanh toán thành công',
+        orderNumber: order.orderNumber,
+        success: false,
+        message: `Thanh toán thất bại (Mã lỗi: ${responseCode})`,
       };
     }
 
-    logger.warn(`[VNPAY] Payment failed for order ${orderId} with code ${responseCode}`);
+    // Payment successful - confirm order if not already confirmed
+    if (order.status === 'PENDING') {
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { status: 'CONFIRMED', confirmedAt: new Date() },
+      });
+      logger.info(`[VNPAY] Order ${order.orderNumber} confirmed successfully on first callback`);
+    } else {
+      // Replay attack detection: same order confirmed again
+      logger.warn(`[VNPAY] Duplicate callback: order ${order.orderNumber} already in status ${order.status}`, {
+        currentStatus: order.status,
+        responseCode,
+      });
+    }
 
     return {
       orderId: order.id,
-      success: false,
-      message: `Thanh toán thất bại (Mã lỗi: ${responseCode})`,
+      orderNumber: order.orderNumber,
+      success: true,
+      message: 'Thanh toán thành công',
     };
   }
 

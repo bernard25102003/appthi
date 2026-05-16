@@ -33,10 +33,11 @@ router.post(
 );
 
 /**
- * GET /api/orders/vnpay/verify-return
+ * POST /api/orders/vnpay/verify-return
  * Verify VNPAY return data
+ * Accepts raw query string in body to avoid encoding issues
  */
-router.get(
+router.post(
   '/vnpay/verify-return',
   asyncHandler((req, res) => controller.verifyVnpayReturn(req, res)),
 );

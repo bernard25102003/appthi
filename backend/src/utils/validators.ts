@@ -75,7 +75,7 @@ export const createOrderSchema = z.object({
   recipientName: z.string().min(2, 'Recipient name is required').max(100),
   recipientPhone: z
     .string()
-    .regex(/^[0-9]{10,11}$/, 'Phone must be 10-11 digits'),
+    .regex(/^[0-9]{10}$/, 'Phone must be exactly 10 digits'),
   recipientAddress: z.string().min(5, 'Address is required').max(500),
   notes: z.string().max(500).optional(),
 });

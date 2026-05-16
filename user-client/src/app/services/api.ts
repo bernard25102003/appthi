@@ -255,6 +255,7 @@ export interface CreateVnpayPaymentResponse {
 
 export interface VerifyVnpayReturnResponse {
   orderId?: string;
+  orderNumber?: string;
   success: boolean;
   message: string;
 }
@@ -267,7 +268,11 @@ export const ordersApi = {
     request<CreateVnpayPaymentResponse>('/orders/vnpay/create-payment-url', { method: 'POST', body: data }),
 
   verifyVnpayReturn: (queryString: string) =>
-    request<VerifyVnpayReturnResponse>(`/orders/vnpay/verify-return${queryString ? `?${queryString}` : ''}`, { auth: false }),
+    request<VerifyVnpayReturnResponse>('/orders/vnpay/verify-return', {
+      auth: false,
+      method: 'POST',
+      body: { rawQueryString: queryString },
+    }),
 
   getMyOrders: (query: { page?: number; limit?: number; status?: OrderStatus } = {}) => {
     const params = new URLSearchParams();

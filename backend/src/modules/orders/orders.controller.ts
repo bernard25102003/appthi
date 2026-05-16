@@ -24,8 +24,20 @@ export class OrdersController {
   }
 
   async verifyVnpayReturn(req: Request, res: Response): Promise<void> {
-    const query = req.query as Record<string, string | undefined>;
-    const result = await ordersService.verifyVnpayReturn(query);
+    const rawQueryString = req.body?.rawQueryString as string;
+    
+    if (!rawQueryString || typeof rawQueryString !== 'string' || !rawQueryString.includes('vnp_')) {
+      throw new Error('Invalid VNPAY callback: rawQueryString missing or malformed');
+    }
+    
+    // Parse raw query string to params object
+    const params = new URLSearchParams(rawQueryString);
+    const query: Record<string, string | undefined> = {};
+    params.forEach((value, key) => {
+      query[key] = value;
+    });
+    
+    const result = await ordersService.verifyVnpayReturn(query, rawQueryString);
     sendSuccess(res, result, 'VNPAY return verified');
   }
 

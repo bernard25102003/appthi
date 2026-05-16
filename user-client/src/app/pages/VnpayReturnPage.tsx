@@ -8,6 +8,7 @@ export function VnpayReturnPage() {
   const [status, setStatus] = useState<'loading' | 'success' | 'failed'>('loading');
   const [message, setMessage] = useState('Đang xác thực kết quả thanh toán...');
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [orderNumber, setOrderNumber] = useState<string | null>(null);
 
   useEffect(() => {
     const verify = async () => {
@@ -15,6 +16,7 @@ export function VnpayReturnPage() {
         const query = new URLSearchParams(location.search);
         const result = await ordersApi.verifyVnpayReturn(query.toString());
         setOrderId(result.orderId ?? null);
+        setOrderNumber(result.orderNumber ?? null);
         setStatus(result.success ? 'success' : 'failed');
         setMessage(result.message);
 
@@ -40,9 +42,9 @@ export function VnpayReturnPage() {
 
         <p className="text-muted-foreground mb-6">{message}</p>
 
-        {orderId && (
+        {orderNumber && (
           <p className="text-sm mb-6">
-            Mã đơn hàng: <strong>{orderId}</strong>
+            Mã đơn hàng: <strong className="text-foreground">{orderNumber}</strong>
           </p>
         )}
 
